@@ -25,7 +25,8 @@ def display_main_menu():
     print("  [6] Acid-Base Analyzer")
     print("  [7] Name to Formula Converter")
     print("  [8] Stoichiometry Calculator")
-    print("  [9] Functional Groups Analyzer")  # Added option for Functional Groups module
+    print("  [9] Functional Groups Analyzer")
+    print("  [10] Colligative Properties Calculator")  # Added option for Colligative Properties module
     print("  [0] Exit")
 
 def get_user_choice():

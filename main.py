@@ -12,7 +12,8 @@ from ui.thermodynamics_ui import ThermodynamicsUI
 from ui.acid_base_ui import AcidBaseUI
 from ui.name_to_formula_ui import NameToFormulaUI
 from ui.stoichiometry_ui import StoichiometryUI
-from ui.functional_groups_ui import FunctionalGroupsUI  # Added import for the new module
+from ui.functional_groups_ui import FunctionalGroupsUI
+from ui.colligative_properties_ui import ColligativePropertiesUI  # Added import for the new module
 
 def main():
     """Main application entry point."""
@@ -67,6 +68,10 @@ def main():
             # Launch Functional Groups Analyzer module
             functional_groups_ui = FunctionalGroupsUI()
             functional_groups_ui.run()
+        elif choice == "10":
+            # Launch Colligative Properties Calculator module
+            colligative_ui = ColligativePropertiesUI()
+            colligative_ui.run()
         # Add more modules as needed
         else:
             print("Invalid choice. Please try again.")

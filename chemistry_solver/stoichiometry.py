@@ -1,8 +1,23 @@
+"""
+Stoichiometry Module for Chemistry Problem Solver
+"""
 from chemistry_solver.molar_mass import calculate_molar_mass
 from chemistry_solver.balancer import parse_chemical_equation, balance_equation, format_balanced_equation
 
 
 def solve_stoichiometry_problem(equation, given_compound, given_mass, target_compound):
+    """
+    Solve a basic stoichiometry problem.
+    
+    Args:
+        equation (str): Chemical equation
+        given_compound (str): Formula of the given compound
+        given_mass (float): Mass of the given compound in grams
+        target_compound (str): Formula of the target compound
+    
+    Returns:
+        dict: Results including balanced equation, target mass, target moles, and solution steps
+    """
     reactants, products = parse_chemical_equation(equation)
     balanced_reactants, balanced_products = balance_equation(reactants, products)
     balanced_equation = format_balanced_equation(balanced_reactants, balanced_products)
@@ -50,6 +65,17 @@ def solve_stoichiometry_problem(equation, given_compound, given_mass, target_com
 
 
 def solve_multireactant_problem(equation, reactant_data, target_compound):
+    """
+    Solve a stoichiometry problem with multiple reactants to find the limiting reactant.
+    
+    Args:
+        equation (str): Chemical equation
+        reactant_data (dict): Dictionary of reactants and their masses in grams
+        target_compound (str): Formula of the target compound
+    
+    Returns:
+        dict: Results including balanced equation, limiting reactant, target mass, and solution steps
+    """
     reactants, products = parse_chemical_equation(equation)
     br, bp = balance_equation(reactants, products)
     beq = format_balanced_equation(br, bp)
@@ -108,6 +134,7 @@ def solve_multireactant_problem(equation, reactant_data, target_compound):
         "steps": steps
     }
 
+
 def calculate_gas_volume(moles, temperature_c=0, pressure_atm=1.0):
     """
     Calculate the volume of gas in liters using the ideal gas law.
@@ -130,6 +157,7 @@ def calculate_gas_volume(moles, temperature_c=0, pressure_atm=1.0):
     volume = (moles * R * temperature_k) / pressure_atm
     
     return volume
+
 
 def solve_gas_stoichiometry_problem(equation, given_compound, given_mass, target_gas, temperature_c=0, pressure_atm=1.0):
     """

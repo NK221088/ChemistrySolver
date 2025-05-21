@@ -2,7 +2,7 @@
 Terminal User Interface for Thermodynamics Calculations
 """
 from ui.terminal_ui import display_title, display_results_header, wait_for_user
-from thermodynamics import (calculate_heat, calculate_temperature_change, calculate_final_temperature,
+from chemistry_solver.thermodynamics import (calculate_heat, calculate_temperature_change, calculate_final_temperature,
                           calculate_molar_heat, solve_thermal_equilibrium, solve_thermal_equilibrium_with_molar_heat,
                           handle_heat_transfer_problem, handle_heat_transfer_with_molar_heat, solve_mixture_problem,
                           calculate_boiling_point_with_pressure, calculate_pressure_with_temperature, 

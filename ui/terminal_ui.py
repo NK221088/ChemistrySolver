@@ -21,7 +21,9 @@ def display_main_menu():
     print("  [2] Chemical Kinetics")
     print("  [3] Molar Mass Calculator")
     print("  [4] Chemical Equation Balancer")
-    print("  [5] Thermodynamics Calculator")  # New option
+    print("  [5] Thermodynamics Calculator")
+    print("  [6] Acid-Base Analyzer")
+    print("  [7] Name to Formula Converter")  # New option
     print("  [0] Exit")
 
 def get_user_choice():

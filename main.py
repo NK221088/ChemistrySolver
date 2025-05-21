@@ -9,7 +9,8 @@ from ui.kinetics_ui import KineticsUI
 from ui.molar_mass_ui import MolarMassUI
 from ui.balancer_ui import BalancerUI
 from ui.thermodynamics_ui import ThermodynamicsUI
-# Import other UI modules as needed
+from ui.acid_base_ui import AcidBaseUI
+from ui.name_to_formula_ui import NameToFormulaUI
 
 def main():
     """Main application entry point."""
@@ -48,6 +49,14 @@ def main():
             # Launch Thermodynamics Calculator module
             thermo_ui = ThermodynamicsUI()
             thermo_ui.run()
+        elif choice == "6":
+            # Launch Acid-Base Analyzer module
+            acid_base_ui = AcidBaseUI()
+            acid_base_ui.run()
+        elif choice == "7":
+            # Launch Name to Formula Converter module
+            name_formula_ui = NameToFormulaUI()
+            name_formula_ui.run()
         # Add more modules as needed
         else:
             print("Invalid choice. Please try again.")

@@ -1,3 +1,7 @@
+"""
+Acid-Base Analysis Module for Chemistry Problem Solver
+"""
+
 def identify_acid_base(compound):
     """
     Identifies if a compound is likely an acid, base, or neutral using Brønsted definition.
@@ -112,30 +116,24 @@ def analyze_compound_list(compounds):
         compounds (list): List of chemical formulas
     
     Returns:
-        bool: True if all compounds are acids, False otherwise
+        dict: Results for each compound and overall analysis
     """
     results = []
     all_acids = True
     
-    print(f"Analyzing compounds: {', '.join(compounds)}")
-    print("-" * 50)
-    
     for compound in compounds:
         result = identify_acid_base(compound)
-        results.append(result)
-        
-        print(f"Compound: {compound}")
-        print(f"Classification: {result['classification']}")
-        print(f"Explanation: {result['explanation']}")
-        print("-" * 50)
+        results.append({
+            "compound": compound,
+            "classification": result["classification"],
+            "explanation": result["explanation"]
+        })
         
         # Check if this compound is NOT an acid
         if "Acid" not in result["classification"] or "Neutral" in result["classification"]:
             all_acids = False
     
-    if all_acids:
-        print("RESULT: All compounds in this list are acids.")
-    else:
-        print("RESULT: Not all compounds in this list are acids.")
-    
-    return all_acids
+    return {
+        "compounds": results,
+        "all_acids": all_acids
+    }

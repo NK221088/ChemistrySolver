@@ -1,5 +1,5 @@
 from chemistry_solver.molar_mass import calculate_molar_mass
-from chemistry_solver.stoichiometry import (solve_stoichiometry_problem, solve_multireactant_problem, 
+from stoichiometry import (solve_stoichiometry_problem, solve_multireactant_problem, 
                         solve_gas_stoichiometry_problem)
 from acid_base import identify_acid_base, analyze_compound_list
 from oxidation_state import calculate_oxidation_number, display_oxidation_result

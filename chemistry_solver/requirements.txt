@@ -1,0 +1,14 @@
+# Core dependencies
+numpy
+matplotlib
+pandas
+
+# Chemistry-specific libraries
+molmass       # Used for molar mass calculations
+pubchempy     # Used for chemical name to formula conversion
+
+# Optional dependencies
+# Uncomment if needed for specific modules
+# scipy        # For advanced calculations
+# rdkit        # For chemical structure handling
+# sympy        # For symbolic mathematics and equation balancing

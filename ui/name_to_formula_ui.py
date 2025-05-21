@@ -56,7 +56,7 @@ class NameToFormulaUI:
                 print(f"Name: {result['name']}")
                 print(f"Formula: {result['formula']}")
                 print(f"IUPAC Name: {result['iupac_name']}")
-                print(f"Molecular Weight: {result['weight']:.4f} g/mol")
+                print(f"Molecular Weight: {float(result['weight']):.4f} g/mol")
             else:
                 print(f"Error: {result['error']}")
                 
@@ -77,7 +77,7 @@ class NameToFormulaUI:
                 print(f"Name: {result['name']}")
                 print(f"Formula: {result['formula']}")
                 print(f"IUPAC Name: {result['iupac_name']}")
-                print(f"Molecular Weight: {result['weight']:.4f} g/mol")
+                print(f"Molecular Weight: {float(result['weight']):.4f} g/mol")
                 print(f"PubChem CID: {result['cid']}")
                 print(f"Charge: {result['charge']}")
                 

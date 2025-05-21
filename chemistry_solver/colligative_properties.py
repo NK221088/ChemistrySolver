@@ -11,6 +11,7 @@ It integrates with the existing molar mass calculation functionality.
 """
 
 from chemistry_solver.molar_mass import calculate_molar_mass
+from chemistry_solver.name_to_formula import get_formula_from_name
 
 # Common freezing point depression constants (Kf) in °C/m
 FREEZING_POINT_CONSTANTS = {
@@ -61,6 +62,14 @@ def calculate_freezing_point_depression(T_pure, T_solution, K_f, solute_mass, so
     solvent_mass_kg = solvent_mass / 1000
     
     # Retrieve solvent molar mass using existing functionality
+    # Convert name to formula if necessary
+    if not any(char.isdigit() for char in solvent):  # crude check for name vs formula
+        name_result = get_formula_from_name(solvent)
+        if name_result['success']:
+            solvent = name_result['formula']
+        else:
+            return {'success': False, 'error': f"Error resolving formula from name: {name_result['error']}"}
+
     solvent_info = calculate_molar_mass(solvent)
     if not solvent_info['success']:
         return {'success': False, 'error': f"Error calculating solvent molar mass: {solvent_info['error']}"}

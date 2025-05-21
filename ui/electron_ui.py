@@ -96,7 +96,9 @@ class ElectronConfigUI:
                 for diagram in result["diagrams"]:
                     print(diagram)
             
-            display_steps(result["steps"], 2)  # Skip the first two steps which are already displayed
+            # Filtering steps - show from step 3 onwards (skip first two)
+            steps_to_display = result["steps"][2:] if len(result["steps"]) > 2 else []
+            display_steps(steps_to_display)
         else:
             print(f"Error: {result['error']}")
     
@@ -129,7 +131,9 @@ class ElectronConfigUI:
             print(f"Electron configuration: {result['configuration']}")
             print(f"Total electrons in {orbital_type}-orbitals: {result[f'{orbital_type}_electrons']}")
             
-            display_steps(result["steps"], 2)  # Skip the first two steps which are already displayed
+            # Filtering steps - show from step 3 onwards (skip first two)
+            steps_to_display = result["steps"][2:] if len(result["steps"]) > 2 else []
+            display_steps(steps_to_display)
         else:
             print(f"Error: {result['error']}")
     
@@ -153,8 +157,9 @@ class ElectronConfigUI:
             if result["is_anomalous"]:
                 print("\nNote: This element has an anomalous configuration due to stability.")
             
-            # Display detailed steps if available
-            display_steps(result["steps"], 1)  # Skip the first step which is already displayed
+            # Filtering steps - show from step 2 onwards (skip first step)
+            steps_to_display = result["steps"][1:] if len(result["steps"]) > 1 else []
+            display_steps(steps_to_display)
         else:
             print(f"Error: {result['error']}")
     
@@ -191,8 +196,9 @@ class ElectronConfigUI:
             print(f"  Magnetic quantum number (ml): possible values {result['ml_possibilities']}")
             print(f"  Spin quantum number (ms): possible values {result['ms_possibilities']}")
             
-            # Display detailed steps if available
-            display_steps(result["steps"], 2)  # Skip the first two steps which are already displayed
+            # Filtering steps - show from step 3 onwards (skip first two)
+            steps_to_display = result["steps"][2:] if len(result["steps"]) > 2 else []
+            display_steps(steps_to_display)
         else:
             print(f"Error: {result['error']}")
     
@@ -247,7 +253,7 @@ class ElectronConfigUI:
                 paramag_result = "Paramagnetic" if result['paramagnetic'] else "Diamagnetic"
                 print(f"Magnetic property: {paramag_result}")
             
-            # Display detailed steps if available
+            # Display all steps since there's no need to skip
             display_steps(result["steps"])
         else:
             print(f"Error: {result['error']}")

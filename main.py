@@ -15,7 +15,8 @@ from ui.stoichiometry_ui import StoichiometryUI
 from ui.functional_groups_ui import FunctionalGroupsUI
 from ui.colligative_properties_ui import ColligativePropertiesUI
 from ui.insoluble_salts_ui import InsolubleSaltsUI
-from ui.oxidation_state_ui import OxidationStateUI  # Add import for our new module
+from ui.oxidation_state_ui import OxidationStateUI
+from ui.redox_ui import RedoxUI  # Import our new redox UI module
 
 def main():
     """Main application entry point."""
@@ -82,6 +83,10 @@ def main():
             # Launch Oxidation State Calculator module
             oxidation_ui = OxidationStateUI()
             oxidation_ui.run()
+        elif choice == "13":
+            # Launch Redox Reactions Analyzer module
+            redox_ui = RedoxUI()
+            redox_ui.run()
         # Add more modules as needed
         else:
             print("Invalid choice. Please try again.")

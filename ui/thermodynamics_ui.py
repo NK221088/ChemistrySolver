@@ -8,12 +8,51 @@ from chemistry_solver.thermodynamics import (calculate_heat, calculate_temperatu
                           calculate_boiling_point_with_pressure, calculate_pressure_with_temperature, 
                           calculate_heat_of_vaporization, parse_reaction_string, solve_enthalpy_problem)
 
+# Import the name_to_formula module
+try:
+    from chemistry_solver.name_to_formula import get_formula_from_name
+except ImportError:
+    # Define a fallback function if the module is not available
+    def get_formula_from_name(compound_name):
+        return {'success': False, 'error': 'pubchempy module not installed'}
+
 try:
     from chemistry_solver.molar_mass import calculate_molar_mass
 except ImportError:
     # Define a fallback function if the module is not available
     def calculate_molar_mass(formula):
         return {'success': False, 'error': 'molmass module not installed'}
+
+# Common substances with their molar masses and formulas as fallbacks
+COMMON_SUBSTANCES = {
+    'water': {'formula': 'H2O', 'molar_mass': 18.01528},
+    'ethanol': {'formula': 'C2H5OH', 'molar_mass': 46.06844},
+    'methanol': {'formula': 'CH3OH', 'molar_mass': 32.04186},
+    'carbon dioxide': {'formula': 'CO2', 'molar_mass': 44.0095},
+    'oxygen': {'formula': 'O2', 'molar_mass': 31.9988},
+    'nitrogen': {'formula': 'N2', 'molar_mass': 28.0134},
+    'hydrogen': {'formula': 'H2', 'molar_mass': 2.01588},
+    'acetone': {'formula': 'C3H6O', 'molar_mass': 58.08},
+    'benzene': {'formula': 'C6H6', 'molar_mass': 78.11},
+    'glucose': {'formula': 'C6H12O6', 'molar_mass': 180.156},
+    'salt': {'formula': 'NaCl', 'molar_mass': 58.44},
+    'sodium chloride': {'formula': 'NaCl', 'molar_mass': 58.44},
+    'sulfuric acid': {'formula': 'H2SO4', 'molar_mass': 98.079},
+    'hydrochloric acid': {'formula': 'HCl', 'molar_mass': 36.46},
+    'ammonia': {'formula': 'NH3', 'molar_mass': 17.03},
+    'gold': {'formula': 'Au', 'molar_mass': 196.97},
+    'silver': {'formula': 'Ag', 'molar_mass': 107.87},
+    'copper': {'formula': 'Cu', 'molar_mass': 63.55},
+    'iron': {'formula': 'Fe', 'molar_mass': 55.85},
+    'aluminum': {'formula': 'Al', 'molar_mass': 26.98},
+    'zinc': {'formula': 'Zn', 'molar_mass': 65.38},
+    'lead': {'formula': 'Pb', 'molar_mass': 207.2},
+    'mercury': {'formula': 'Hg', 'molar_mass': 200.59},
+    'calcium carbonate': {'formula': 'CaCO3', 'molar_mass': 100.09},
+    'sodium hydroxide': {'formula': 'NaOH', 'molar_mass': 40.00},
+    'potassium hydroxide': {'formula': 'KOH', 'molar_mass': 56.11},
+    'acetic acid': {'formula': 'CH3COOH', 'molar_mass': 60.05},
+}
 
 class ThermodynamicsUI:
     """UI class for thermodynamics calculations."""
@@ -146,6 +185,64 @@ class ThermodynamicsUI:
         print(f"Heat transferred by substance 1: {result['heat_transferred_1']:.2f} J")
         print(f"Heat transferred by substance 2: {result['heat_transferred_2']:.2f} J")
 
+    def _get_molar_mass_from_input(self, name_or_formula):
+        """
+        Helper function to determine molar mass from a substance name or formula.
+        Tries multiple methods:
+        1. Direct calculation if it's a formula
+        2. Looking up in common substances dictionary
+        3. Getting formula from name via PubChem and then calculate
+        4. Asking the user if all else fails
+        """
+        name_or_formula = name_or_formula.strip().lower()
+        
+        # Check if it's in our common substances dictionary
+        if name_or_formula in COMMON_SUBSTANCES:
+            formula = COMMON_SUBSTANCES[name_or_formula]['formula']
+            molar_mass = COMMON_SUBSTANCES[name_or_formula]['molar_mass']
+            print(f"Found in common substances: {formula}, molar mass = {molar_mass:.4f} g/mol")
+            return formula, molar_mass
+        
+        # Try direct calculation if it might be a formula
+        try:
+            molar_mass_result = calculate_molar_mass(name_or_formula)
+            if molar_mass_result['success']:
+                formula = name_or_formula
+                molar_mass = molar_mass_result['molar_mass']
+                print(f"Calculated molar mass from formula: {molar_mass:.4f} g/mol")
+                return formula, molar_mass
+        except Exception:
+            pass
+        
+        # Try to get formula from name using PubChem
+        try:
+            formula_result = get_formula_from_name(name_or_formula)
+            if formula_result['success']:
+                formula = formula_result['formula']
+                molar_mass = formula_result['weight']
+                print(f"Found formula via PubChem: {formula}, molar mass = {molar_mass:.4f} g/mol")
+                return formula, molar_mass
+        except Exception:
+            pass
+        
+        # If we couldn't determine it automatically, ask the user
+        print("Could not automatically determine molar mass.")
+        formula = input(f"Enter chemical formula for {name_or_formula}: ")
+        
+        # Try again with the provided formula
+        try:
+            molar_mass_result = calculate_molar_mass(formula)
+            if molar_mass_result['success']:
+                molar_mass = molar_mass_result['molar_mass']
+                print(f"Calculated molar mass: {molar_mass:.4f} g/mol")
+                return formula, molar_mass
+        except Exception:
+            pass
+        
+        # As a last resort, ask for the molar mass directly
+        molar_mass = float(input("Enter molar mass (g/mol): "))
+        return formula, molar_mass
+
     def _handle_thermal_equilibrium_molar(self):
         """
         Handler function for solving thermal equilibrium problems using molar heat capacities.
@@ -158,18 +255,8 @@ class ThermodynamicsUI:
         name1 = input("Enter substance name or chemical formula: ")
         mass1 = float(input("Enter mass (g): "))
         
-        # Try to calculate molar mass if a chemical formula is given
-        try:
-            molar_mass_result = calculate_molar_mass(name1)
-            if molar_mass_result['success']:
-                molar_mass1 = molar_mass_result['molar_mass']
-                print(f"Calculated molar mass: {molar_mass1:.4f} g/mol")
-            else:
-                print("Could not automatically calculate molar mass.")
-                molar_mass1 = float(input("Enter molar mass (g/mol): "))
-        except Exception:
-            print("Could not automatically calculate molar mass.")
-            molar_mass1 = float(input("Enter molar mass (g/mol): "))
+        # Try to calculate molar mass if a chemical name or formula is given
+        formula1, molar_mass1 = self._get_molar_mass_from_input(name1)
         
         molar_heat_capacity1 = float(input("Enter molar heat capacity (J/(mol·K)): "))
         initial_temp1 = float(input("Enter initial temperature (°C): "))
@@ -179,18 +266,8 @@ class ThermodynamicsUI:
         name2 = input("Enter substance name or chemical formula: ")
         mass2 = float(input("Enter mass (g): "))
         
-        # Try to calculate molar mass if a chemical formula is given
-        try:
-            molar_mass_result = calculate_molar_mass(name2)
-            if molar_mass_result['success']:
-                molar_mass2 = molar_mass_result['molar_mass']
-                print(f"Calculated molar mass: {molar_mass2:.4f} g/mol")
-            else:
-                print("Could not automatically calculate molar mass.")
-                molar_mass2 = float(input("Enter molar mass (g/mol): "))
-        except Exception:
-            print("Could not automatically calculate molar mass.")
-            molar_mass2 = float(input("Enter molar mass (g/mol): "))
+        # Try to calculate molar mass if a chemical name or formula is given
+        formula2, molar_mass2 = self._get_molar_mass_from_input(name2)
         
         molar_heat_capacity2 = float(input("Enter molar heat capacity (J/(mol·K)): "))
         initial_temp2 = float(input("Enter initial temperature (°C): "))
@@ -229,17 +306,7 @@ class ThermodynamicsUI:
             
             if use_molar_heat:
                 # Try to calculate molar mass if a chemical formula is given
-                try:
-                    molar_mass_result = calculate_molar_mass(name)
-                    if molar_mass_result['success']:
-                        molar_mass = molar_mass_result['molar_mass']
-                        print(f"Calculated molar mass: {molar_mass:.4f} g/mol")
-                    else:
-                        print("Could not automatically calculate molar mass.")
-                        molar_mass = float(input("Enter molar mass (g/mol): "))
-                except Exception:
-                    print("Could not automatically calculate molar mass.")
-                    molar_mass = float(input("Enter molar mass (g/mol): "))
+                formula, molar_mass = self._get_molar_mass_from_input(name)
                     
                 molar_heat_capacity = float(input("Enter molar heat capacity (J/(mol·K)): "))
                 # Calculate specific heat
@@ -247,11 +314,15 @@ class ThermodynamicsUI:
                 print(f"Calculated specific heat: {specific_heat:.4f} J/(g·K)")
             else:
                 specific_heat = float(input("Enter specific heat capacity (J/(g·K)): "))
+                formula = name
+                molar_mass = None
+                molar_heat_capacity = None
             
             initial_temp = float(input("Enter initial temperature (°C): "))
             
             substance = {
                 'name': name,
+                'formula': formula,
                 'mass': mass,
                 'specific_heat': specific_heat,
                 'initial_temp': initial_temp

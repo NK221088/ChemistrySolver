@@ -1,0 +1,12 @@
+# Ignore all __pycache__ folders recursively
+**/__pycache__/
+
+# Ignore compiled Python files
+*.py[cod]
+
+# (Optional) Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# (Optional) Ignore virtual environments (common names)
+venv/
+env/

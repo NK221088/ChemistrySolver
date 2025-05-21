@@ -5,7 +5,6 @@ import os
 
 def clear_screen():
     """Clear the terminal screen."""
-    # Check if the OS is Windows or Unix-like and use appropriate command
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def display_title(title):
@@ -22,7 +21,7 @@ def display_main_menu():
     print("  [2] Chemical Kinetics")
     print("  [3] Molar Mass Calculator")
     print("  [4] Chemical Equation Balancer")
-    # Add more modules here
+    print("  [5] Thermodynamics Calculator")  # New option
     print("  [0] Exit")
 
 def get_user_choice():

@@ -8,6 +8,7 @@ from ui.electron_ui import ElectronConfigUI
 from ui.kinetics_ui import KineticsUI
 from ui.molar_mass_ui import MolarMassUI
 from ui.balancer_ui import BalancerUI
+from ui.thermodynamics_ui import ThermodynamicsUI
 # Import other UI modules as needed
 
 def main():
@@ -43,6 +44,10 @@ def main():
             # Launch Chemical Equation Balancer module
             balancer_ui = BalancerUI()
             balancer_ui.run()
+        elif choice == "5":
+            # Launch Thermodynamics Calculator module
+            thermo_ui = ThermodynamicsUI()
+            thermo_ui.run()
         # Add more modules as needed
         else:
             print("Invalid choice. Please try again.")

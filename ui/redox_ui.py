@@ -6,7 +6,11 @@ from chemistry_solver.redox_reactions import (
     parse_redox_reaction, 
     determine_redox_favorability, 
     determine_favorability_from_potentials,
-    get_half_reaction_by_element
+    get_half_reaction_by_element,
+    find_standard_reduction_potential,
+    calculate_nernst_equation,
+    get_common_redox_reaction,
+    get_redox_pair
 )
 
 class RedoxUI:
@@ -21,7 +25,7 @@ class RedoxUI:
         
         while True:
             self._display_menu()
-            choice = input("\nEnter choice (0-4): ").strip()
+            choice = input("\nEnter choice (0-6): ").strip()
             
             if choice == "0":
                 # Return to main menu
@@ -33,6 +37,10 @@ class RedoxUI:
             elif choice == "3":
                 self._handle_half_reaction_lookup()
             elif choice == "4":
+                self._handle_common_redox_lookup()
+            elif choice == "5":
+                self._handle_nernst_equation()
+            elif choice == "6":
                 self._handle_about_redox()
             else:
                 print("Invalid choice. Please try again.")
@@ -45,7 +53,9 @@ class RedoxUI:
         [1] Analyze redox reaction
         [2] Calculate reaction favorability from potentials
         [3] Look up half-reactions by element
-        [4] About redox reactions
+        [4] Look up common redox reactions
+        [5] Calculate potential using Nernst equation
+        [6] About redox reactions
         [0] Return to main menu
         """
         print(menu)
@@ -64,9 +74,16 @@ class RedoxUI:
             display_results_header()
             if result['favorable'] is not None:
                 print(f"Reaction is {result['message']}")
-                print(f"Oxidation half-reaction: {result['oxidation_half']}")
-                print(f"Reduction half-reaction: {result['reduction_half']}")
                 
+                # Check if oxidation_half is available in the result
+                if 'oxidation_half' in result and result['oxidation_half']:
+                    print(f"Oxidation half-reaction: {result['oxidation_half']}")
+                
+                # Check if reduction_half is available in the result
+                if 'reduction_half' in result and result['reduction_half']:
+                    print(f"Reduction half-reaction: {result['reduction_half']}")
+                
+                # Check if e_cell is available in the result
                 if 'e_cell' in result:
                     print(f"Standard cell potential: {result['e_cell']:.3f} V")
                 
@@ -82,34 +99,60 @@ class RedoxUI:
                     print("Enter reduction half-reaction:")
                     reduction_half = input("> ")
                     
-                    print("\nDo you know the standard reduction potentials for these half-reactions? (y/n)")
-                    pot_choice = input("> ").strip().lower()
+                    # Try to find standard reduction potentials
+                    oxidation_potential = find_standard_reduction_potential(
+                        oxidation_half.replace("->", "←").replace("+", "-").replace("2e⁻", "")
+                    )
+                    reduction_potential = find_standard_reduction_potential(reduction_half)
                     
-                    if pot_choice == 'y':
-                        try:
-                            print("\nEnter standard reduction potential for oxidation half-reaction (V):")
-                            oxidation_potential = float(input("> "))
-                            print("Enter standard reduction potential for reduction half-reaction (V):")
-                            reduction_potential = float(input("> "))
-                            
-                            # Calculate favorability
-                            favor_result = determine_favorability_from_potentials(oxidation_potential, reduction_potential)
-                            
-                            print("\n" + "-"*50)
-                            print("MANUAL ANALYSIS RESULTS".center(50))
-                            print("-"*50)
-                            
-                            print(f"Oxidation half-reaction: {oxidation_half}")
-                            print(f"Reduction half-reaction: {reduction_half}")
-                            print(f"Reaction is {favor_result['message']}")
-                            print(f"Standard cell potential: {favor_result['e_cell']:.3f} V")
-                            
-                            display_steps(favor_result['steps'])
-                        except ValueError:
-                            print("Error: Please enter valid numerical values for potentials.")
+                    if oxidation_potential is not None and reduction_potential is not None:
+                        print(f"\nFound standard reduction potentials:")
+                        print(f"Oxidation half-reaction potential: {oxidation_potential} V")
+                        print(f"Reduction half-reaction potential: {reduction_potential} V")
+                        
+                        # Calculate favorability automatically
+                        favor_result = determine_favorability_from_potentials(oxidation_potential, reduction_potential)
+                        
+                        print("\n" + "-"*50)
+                        print("AUTOMATIC ANALYSIS RESULTS".center(50))
+                        print("-"*50)
+                        
+                        print(f"Oxidation half-reaction: {oxidation_half}")
+                        print(f"Reduction half-reaction: {reduction_half}")
+                        print(f"Reaction is {favor_result['message']}")
+                        print(f"Standard cell potential: {favor_result['e_cell']:.3f} V")
+                        
+                        display_steps(favor_result['steps'])
                     else:
-                        print("\nWithout reduction potentials, favorability cannot be determined.")
-                        print("You can use option [2] from the menu to calculate favorability if you find the potentials.")
+                        print("\nCouldn't find standard reduction potentials automatically.")
+                        print("Do you know the standard reduction potentials for these half-reactions? (y/n)")
+                        pot_choice = input("> ").strip().lower()
+                        
+                        if pot_choice == 'y':
+                            try:
+                                print("\nEnter standard reduction potential for oxidation half-reaction (V):")
+                                oxidation_potential = float(input("> "))
+                                print("Enter standard reduction potential for reduction half-reaction (V):")
+                                reduction_potential = float(input("> "))
+                                
+                                # Calculate favorability
+                                favor_result = determine_favorability_from_potentials(oxidation_potential, reduction_potential)
+                                
+                                print("\n" + "-"*50)
+                                print("MANUAL ANALYSIS RESULTS".center(50))
+                                print("-"*50)
+                                
+                                print(f"Oxidation half-reaction: {oxidation_half}")
+                                print(f"Reduction half-reaction: {reduction_half}")
+                                print(f"Reaction is {favor_result['message']}")
+                                print(f"Standard cell potential: {favor_result['e_cell']:.3f} V")
+                                
+                                display_steps(favor_result['steps'])
+                            except ValueError:
+                                print("Error: Please enter valid numerical values for potentials.")
+                        else:
+                            print("\nWithout reduction potentials, favorability cannot be determined.")
+                            print("You can use option [2] from the menu to calculate favorability if you find the potentials.")
                 
         except Exception as e:
             print(f"Error: {str(e)}")
@@ -159,10 +202,131 @@ class RedoxUI:
             print("1. Identify the relevant half-reactions for your redox process")
             print("2. Use option [2] in the menu to manually calculate favorability")
             print("   using the potentials shown above")
+            
+            # Add option to check a specific half-reaction
+            print("\nWould you like to look up a specific half-reaction? (y/n)")
+            choice = input("> ").strip().lower()
+            
+            if choice == 'y':
+                print("\nEnter the half-reaction:")
+                half_reaction = input("> ")
+                potential = find_standard_reduction_potential(half_reaction)
+                
+                if potential is not None:
+                    print(f"\nStandard reduction potential for '{half_reaction}': {potential} V")
+                else:
+                    print(f"\nCould not find standard reduction potential for '{half_reaction}'")
         else:
             print(f"No half-reactions found for {element} in state {state if state else 'any'}.")
             print("Try searching for the base element (e.g., 'Mn' instead of 'MnO4-')")
             print("or check if the element symbol is correct.")
+    
+    def _handle_common_redox_lookup(self):
+        """Handle lookup of common redox reactions and pairs."""
+        print("\n===== COMMON REDOX REACTIONS LOOKUP =====")
+        print("This tool helps find information about common redox reactions and pairs")
+        
+        print("\nLookup options:")
+        print("[1] Common redox reaction by name")
+        print("[2] Common redox pair by name")
+        print("[0] Back to main redox menu")
+        
+        choice = input("\nEnter choice (0-2): ").strip()
+        
+        if choice == "0":
+            return
+        elif choice == "1":
+            print("\nEnter the name of a common redox reaction:")
+            print("Examples: Metal displacement, Combustion, Silver mirror test, etc.")
+            name = input("> ")
+            
+            reaction = get_common_redox_reaction(name)
+            if reaction:
+                print("\n" + "-"*50)
+                print(f"COMMON REDOX REACTION: {name}".center(50))
+                print("-"*50)
+                
+                print(f"Reaction: {reaction.get('reaction', 'N/A')}")
+                print(f"Balanced equation: {reaction.get('balanced_equation', 'N/A')}")
+                print(f"Oxidation half: {reaction.get('oxidation_half', 'N/A')}")
+                print(f"Reduction half: {reaction.get('reduction_half', 'N/A')}")
+                
+                if 'notes' in reaction:
+                    print(f"\nNotes: {reaction['notes']}")
+            else:
+                print(f"No common redox reaction found with name '{name}'")
+                
+        elif choice == "2":
+            print("\nEnter the name of a common redox pair:")
+            print("Examples: Copper-Zinc, Iron-Magnesium, etc.")
+            name = input("> ")
+            
+            pair = get_redox_pair(name)
+            if pair:
+                print("\n" + "-"*50)
+                print(f"COMMON REDOX PAIR: {name}".center(50))
+                print("-"*50)
+                
+                print(f"Net reaction: {pair.get('net_reaction', 'N/A')}")
+                print(f"Oxidation: {pair.get('oxidation', 'N/A')}")
+                print(f"Reduction: {pair.get('reduction', 'N/A')}")
+                print(f"Standard cell potential: {pair.get('e_cell', 'N/A')} V")
+                print(f"Favorable: {'Yes' if pair.get('favorable', False) else 'No'}")
+                
+                if 'notes' in pair:
+                    print(f"\nNotes: {pair['notes']}")
+            else:
+                print(f"No common redox pair found with name '{name}'")
+        else:
+            print("Invalid choice.")
+    
+    def _handle_nernst_equation(self):
+        """Handle Nernst equation calculations."""
+        print("\n===== NERNST EQUATION CALCULATOR =====")
+        print("This tool calculates cell potential under non-standard conditions")
+        
+        try:
+            e_cell_standard = float(input("Enter standard cell potential E°cell (V): "))
+            n = int(input("Enter number of electrons transferred: "))
+            concentration_ratio = float(input("Enter concentration ratio [products]/[reactants]: "))
+            temp_choice = input("Use standard temperature (25°C)? (y/n): ").strip().lower()
+            
+            if temp_choice == 'n':
+                temp_celsius = float(input("Enter temperature (°C): "))
+                temperature = temp_celsius + 273.15
+            else:
+                temperature = 298.15  # 25°C in Kelvin
+            
+            e_cell = calculate_nernst_equation(e_cell_standard, n, concentration_ratio, temperature)
+            
+            display_results_header()
+            print(f"Standard cell potential (E°cell): {e_cell_standard:.3f} V")
+            print(f"Cell potential under given conditions (Ecell): {e_cell:.3f} V")
+            
+            # Show calculation steps
+            steps = [
+                f"1. Standard cell potential (E°cell): {e_cell_standard:.3f} V",
+                f"2. Number of electrons transferred (n): {n}",
+                f"3. Concentration ratio [products]/[reactants]: {concentration_ratio}",
+                f"4. Temperature: {temperature-273.15:.1f}°C ({temperature:.2f} K)",
+                f"5. Using the Nernst equation: Ecell = E°cell - ((RT)/(nF))·ln(Q)",
+                f"   where R = 8.314 J/(mol·K), F = 96485 C/mol, Q = concentration ratio",
+                f"6. Ecell = {e_cell_standard:.3f} - ((8.314 × {temperature:.2f})/(${n} × 96485))·2.303·log10({concentration_ratio})",
+                f"7. Ecell = {e_cell:.3f} V"
+            ]
+            
+            display_steps(steps)
+            
+            # Provide interpretation
+            if e_cell > 0:
+                print("\nThe reaction is favorable under these conditions (Ecell > 0).")
+            else:
+                print("\nThe reaction is not favorable under these conditions (Ecell ≤ 0).")
+            
+        except ValueError:
+            print("Error: Please enter valid numerical values.")
+        except Exception as e:
+            print(f"Error: {str(e)}")
     
     def _handle_about_redox(self):
         """Display information about redox reactions."""
@@ -203,7 +367,17 @@ Reduction: MnO4- + 8H+ + 5e- -> Mn2+ + 4H2O
 
 To balance: Multiply oxidation by 5, reduction by 2, then add.
 
-For analyzing such reactions:
+The Nernst Equation:
+- Used to calculate cell potential under non-standard conditions
+- Ecell = E°cell - ((RT)/(nF))·ln(Q)
+  where:
+  - R = gas constant (8.314 J/(mol·K))
+  - T = temperature in Kelvin
+  - n = number of electrons transferred
+  - F = Faraday constant (96485 C/mol)
+  - Q = reaction quotient ([products]/[reactants])
+
+For analyzing reactions:
 - Look up standard reduction potentials for each half-reaction
 - Calculate E°cell = E°reduction - E°oxidation
 - Positive E°cell indicates spontaneous reaction

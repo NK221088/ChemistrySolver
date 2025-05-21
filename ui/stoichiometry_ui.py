@@ -21,7 +21,7 @@ class StoichiometryUI:
         
         while True:
             self._display_menu()
-            choice = input("\nEnter choice (0-3): ").strip()
+            choice = input("\nEnter choice (0-4): ").strip()
             
             if choice == "0":
                 # Return to main menu
@@ -32,6 +32,8 @@ class StoichiometryUI:
                 self._handle_limiting_reactant()
             elif choice == "3":
                 self._handle_gas_stoichiometry()
+            elif choice == "4":
+                self._handle_multireactant_fixed_masses()
             else:
                 print("Invalid choice. Please try again.")
             
@@ -43,6 +45,7 @@ class StoichiometryUI:
         [1] Basic Stoichiometry (Mass-to-Mass)
         [2] Limiting Reactant Analysis
         [3] Gas Stoichiometry
+        [4] Fixed Mass Multireactant Problem
         [0] Return to main menu
         """
         print(menu)
@@ -97,6 +100,52 @@ class StoichiometryUI:
                 print("Error: No reactants provided.")
                 return
             
+            target_compound = input("\nEnter the formula of the product you want to find: ")
+            
+            result = solve_multireactant_problem(equation, reactant_data, target_compound)
+            
+            display_results_header()
+            print(f"Balanced Equation: {result['balanced_equation']}")
+            print(f"Limiting Reactant: {result['limiting_reactant']}")
+            print(f"Maximum Product Mass: {result['target_mass']:.4f} g")
+            
+            display_steps(result['steps'])
+                
+        except ValueError as e:
+            print(f"Error: {str(e)}")
+        except Exception as e:
+            print(f"An unexpected error occurred: {str(e)}")
+    
+    def _handle_multireactant_fixed_masses(self):
+        """Handle a problem with specific fixed masses of multiple reactants."""
+        print("\n===== FIXED MASS MULTIREACTANT PROBLEM =====")
+        
+        try:
+            print("\nEnter the chemical equation (use -> or → for the reaction arrow):")
+            equation = input("Equation: ")
+            
+            # Get masses for reactants
+            reactant_data = {}
+            
+            # First reactant
+            reactant1 = input("\nEnter first reactant formula: ")
+            mass1 = float(input(f"Enter mass of {reactant1} in grams: "))
+            reactant_data[reactant1] = mass1
+            
+            # Second reactant
+            reactant2 = input("\nEnter second reactant formula: ")
+            mass2 = float(input(f"Enter mass of {reactant2} in grams: "))
+            reactant_data[reactant2] = mass2
+            
+            # Ask for additional reactants
+            add_more = input("\nDo you want to add more reactants? (y/n): ").lower()
+            while add_more == 'y':
+                reactant = input("Enter reactant formula: ")
+                mass = float(input(f"Enter mass of {reactant} in grams: "))
+                reactant_data[reactant] = mass
+                add_more = input("Do you want to add more reactants? (y/n): ").lower()
+            
+            # Get target product
             target_compound = input("\nEnter the formula of the product you want to find: ")
             
             result = solve_multireactant_problem(equation, reactant_data, target_compound)

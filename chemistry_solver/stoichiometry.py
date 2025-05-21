@@ -80,11 +80,11 @@ def solve_multireactant_problem(equation, reactant_data, target_compound):
     br, bp = balance_equation(reactants, products)
     beq = format_balanced_equation(br, bp)
 
-    all = {f: c for c, f in br + bp}
-    if target_compound not in all:
-        raise ValueError("Target not found.")
+    all_compounds = {f: c for c, f in br + bp}
+    if target_compound not in all_compounds:
+        raise ValueError(f"Target compound {target_compound} not found in equation.")
 
-    target_coef = all[target_compound]
+    target_coef = all_compounds[target_compound]
     target_result = calculate_molar_mass(target_compound)
     if not target_result['success']:
         raise ValueError(target_result['error'])
@@ -94,12 +94,13 @@ def solve_multireactant_problem(equation, reactant_data, target_compound):
     limiting = None
     min_mass = float('inf')
 
-    steps = [f"Balanced: {beq}"]
+    steps = [f"1. Balanced equation: {beq}"]
 
     for reac, mass in reactant_data.items():
-        if reac not in all:
-            raise ValueError(f"{reac} not in equation")
-        reac_coef = all[reac]
+        if reac not in all_compounds:
+            raise ValueError(f"{reac} not found in equation.")
+        
+        reac_coef = all_compounds[reac]
         reac_result = calculate_molar_mass(reac)
         if not reac_result['success']:
             raise ValueError(reac_result['error'])
@@ -115,22 +116,35 @@ def solve_multireactant_problem(equation, reactant_data, target_compound):
             "target_mass": t_mass
         }
 
-        steps.extend([
-            f"\nReactant: {reac}",
-            f"  - Moles: {mass:.2f} / {reac_molar_mass:.4f} = {moles:.6f}",
-            f"  - Target mass: {t_moles:.6f} × {target_molar_mass:.4f} = {t_mass:.4f} g"
-        ])
+        steps.append(f"\n2. Reactant: {reac}")
+        steps.append(f"   - Molar mass: {reac_molar_mass:.4f} g/mol")
+        steps.append(f"   - Mass: {mass:.4f} g")
+        steps.append(f"   - Moles: {mass:.4f} g / {reac_molar_mass:.4f} g/mol = {moles:.6f} mol")
+        steps.append(f"   - Coefficient in balanced equation: {reac_coef}")
+        steps.append(f"   - Stoichiometric ratio ({target_compound}:{reac}): {target_coef}:{reac_coef}")
+        steps.append(f"   - Theoretical moles of {target_compound}: {moles:.6f} mol × ({target_coef}/{reac_coef}) = {t_moles:.6f} mol")
+        steps.append(f"   - Theoretical mass of {target_compound}: {t_moles:.6f} mol × {target_molar_mass:.4f} g/mol = {t_mass:.4f} g")
 
         if t_mass < min_mass:
             min_mass = t_mass
             limiting = reac
 
-    steps.append(f"\nLimiting reactant: {limiting}, yields {min_mass:.4f} g of {target_compound}")
+    steps.append(f"\n3. Limiting reactant analysis:")
+    for reac, yield_data in yields.items():
+        if reac == limiting:
+            steps.append(f"   - {reac}: {yield_data['target_mass']:.4f} g of {target_compound} (LIMITING REACTANT)")
+        else:
+            steps.append(f"   - {reac}: {yield_data['target_mass']:.4f} g of {target_compound}")
+
+    steps.append(f"\n4. Final result:")
+    steps.append(f"   - Limiting reactant: {limiting}")
+    steps.append(f"   - Maximum yield of {target_compound}: {min_mass:.4f} g")
 
     return {
         "balanced_equation": beq,
         "limiting_reactant": limiting,
         "target_mass": min_mass,
+        "all_yields": yields,
         "steps": steps
     }
 
@@ -157,6 +171,87 @@ def calculate_gas_volume(moles, temperature_c=0, pressure_atm=1.0):
     volume = (moles * R * temperature_k) / pressure_atm
     
     return volume
+
+
+def calculate_molar_masses_manually(formulas):
+    """
+    Calculate molar masses for multiple compounds.
+    
+    Args:
+        formulas (list): List of chemical formulas
+        
+    Returns:
+        dict: Dictionary with formula as key and molar mass as value
+    """
+    # Atomic masses
+    atomic_masses = {
+        'H': 1.008,
+        'He': 4.003,
+        'Li': 6.941,
+        'Be': 9.012,
+        'B': 10.811,
+        'C': 12.011,
+        'N': 14.007,
+        'O': 15.999,
+        'F': 18.998,
+        'Ne': 20.180,
+        'Na': 22.990,
+        'Mg': 24.305,
+        'Al': 26.982,
+        'Si': 28.086,
+        'P': 30.974,
+        'S': 32.065,
+        'Cl': 35.453,
+        'Ar': 39.948,
+        'K': 39.098,
+        'Ca': 40.078,
+        'Fe': 55.845,
+        'Cu': 63.546,
+        'Zn': 65.38,
+        'Ag': 107.868,
+        'I': 126.904,
+        'Au': 196.967,
+        'Hg': 200.59,
+        'Pb': 207.2
+    }
+    
+    # Function to parse formula and calculate molar mass
+    def parse_formula(formula):
+        import re
+        
+        # Parse the formula
+        pattern = r'([A-Z][a-z]*)(\d*)'
+        matches = re.findall(pattern, formula)
+        
+        total_mass = 0
+        for element, count in matches:
+            if element not in atomic_masses:
+                raise ValueError(f"Element {element} not found in database")
+            
+            count = int(count) if count else 1
+            total_mass += atomic_masses[element] * count
+            
+        return round(total_mass, 4)
+    
+    result = {}
+    for formula in formulas:
+        try:
+            # Try with molmass module first
+            mol_result = calculate_molar_mass(formula)
+            if mol_result['success']:
+                result[formula] = mol_result['molar_mass']
+            else:
+                # Fallback to manual calculation
+                result[formula] = parse_formula(formula)
+        except:
+            # If any error, try manual calculation
+            try:
+                result[formula] = parse_formula(formula)
+            except Exception as e:
+                result[formula] = None
+                print(f"Error calculating molar mass for {formula}: {str(e)}")
+    
+    return result
 
 
 def solve_gas_stoichiometry_problem(equation, given_compound, given_mass, target_gas, temperature_c=0, pressure_atm=1.0):

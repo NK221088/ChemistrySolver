@@ -1,3 +1,6 @@
+"""
+Oxidation State Calculator Module for Chemistry Problem Solver
+"""
 import re
 
 def parse_formula(formula):
@@ -117,18 +120,3 @@ def calculate_oxidation_number(compound, element):
         "oxidation_number": unknown_oxidation,
         "steps": steps
     }
-
-def display_oxidation_result(result):
-    """
-    Display the oxidation number calculation result.
-    
-    Args:
-        result (dict): The result from calculate_oxidation_number
-    """
-    print(f"\n=== Oxidation Number Calculation ===")
-    print(f"Compound: {result['compound']}")
-    print(f"Element: {result['element']}")
-    print(f"Oxidation Number: {result['oxidation_number']}")
-    print("\nCalculation Steps:")
-    for step in result['steps']:
-        print(step)

@@ -1,3 +1,6 @@
+"""
+Functional Groups Module - Identifies and analyzes functional groups in chemical compounds
+"""
 import re
 
 def identify_functional_groups(compound_name=None, smiles=None):
@@ -333,45 +336,3 @@ def solve_functional_group_problem(compound_name, options):
         "missing_groups": missing,
         "explanation": f"The functional group(s) {', '.join(missing)} are not present in {compound_name}."
     }
-
-def handle_functional_groups():
-    """
-    Handler function for identifying functional groups in a compound.
-    """
-    compound = input("Enter compound name: ")
-    result = explain_functional_groups_in_compound(compound_name=compound)
-    
-    print(f"\n=== Functional Groups in {result['compound']} ===")
-    if result['functional_groups']:
-        print("Identified functional groups:")
-        for i, (group, explanation) in enumerate(zip(result['functional_groups'], result['explanations'])):
-            print(f"  {i+1}. {group.capitalize()}: {explanation}")
-    else:
-        print("No functional groups identified.")
-
-def handle_functional_group_problem():
-    """
-    Handler function for solving which functional group is NOT present in a compound.
-    """
-    compound = input("Enter compound name: ")
-    print("Enter functional groups to check (comma-separated):")
-    options_input = input("e.g., methyl, carboxyl, hydroxyl, amine, halogen: ")
-    options = [opt.strip().lower() for opt in options_input.split(",")]
-    
-    result = solve_functional_group_problem(compound, options)
-    
-    print(f"\n=== Functional Group Analysis for {result['compound']} ===")
-    print("Present functional groups:")
-    for group in result['present_groups']:
-        print(f"  - {group}")
-    
-    print("\nMissing functional groups:")
-    for group in result['missing_groups']:
-        print(f"  - {group}")
-    
-    if len(result['missing_groups']) == 1:
-        print(f"\nAnswer: {result['missing_groups'][0]} is NOT present in {result['compound']}.")
-    elif len(result['missing_groups']) > 1:
-        print(f"\nAnswer: Multiple functional groups are not present in {result['compound']}.")
-    else:
-        print(f"\nAnswer: All specified functional groups are present in {result['compound']}.")

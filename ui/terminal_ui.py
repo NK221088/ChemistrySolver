@@ -24,7 +24,8 @@ def display_main_menu():
     print("  [5] Thermodynamics Calculator")
     print("  [6] Acid-Base Analyzer")
     print("  [7] Name to Formula Converter")
-    print("  [8] Stoichiometry Calculator")  # Added option for Stoichiometry module
+    print("  [8] Stoichiometry Calculator")
+    print("  [9] Functional Groups Analyzer")  # Added option for Functional Groups module
     print("  [0] Exit")
 
 def get_user_choice():

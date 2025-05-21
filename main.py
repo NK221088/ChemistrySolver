@@ -11,7 +11,8 @@ from ui.balancer_ui import BalancerUI
 from ui.thermodynamics_ui import ThermodynamicsUI
 from ui.acid_base_ui import AcidBaseUI
 from ui.name_to_formula_ui import NameToFormulaUI
-from ui.stoichiometry_ui import StoichiometryUI  # Added import for the new module
+from ui.stoichiometry_ui import StoichiometryUI
+from ui.functional_groups_ui import FunctionalGroupsUI  # Added import for the new module
 
 def main():
     """Main application entry point."""
@@ -62,6 +63,10 @@ def main():
             # Launch Stoichiometry Calculator module
             stoichiometry_ui = StoichiometryUI()
             stoichiometry_ui.run()
+        elif choice == "9":
+            # Launch Functional Groups Analyzer module
+            functional_groups_ui = FunctionalGroupsUI()
+            functional_groups_ui.run()
         # Add more modules as needed
         else:
             print("Invalid choice. Please try again.")

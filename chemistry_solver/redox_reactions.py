@@ -2,78 +2,21 @@
 Redox Reactions Module for Chemistry Problem Solver
 """
 
-# Standard reduction potentials (V vs. SHE) at 25°C
-STANDARD_REDUCTION_POTENTIALS = {
-    # Non-metals
-    "F2(g) + 2e- → 2F-(aq)": 2.87,
-    "O3(g) + 2H+(aq) + 2e- → O2(g) + H2O(l)": 2.07,
-    "H2O2(aq) + 2H+(aq) + 2e- → 2H2O(l)": 1.78,
-    "MnO4-(aq) + 8H+(aq) + 5e- → Mn2+(aq) + 4H2O(l)": 1.51,
-    "Cl2(g) + 2e- → 2Cl-(aq)": 1.36,
-    "Cr2O7^2-(aq) + 14H+(aq) + 6e- → 2Cr3+(aq) + 7H2O(l)": 1.33,
-    "O2(g) + 4H+(aq) + 4e- → 2H2O(l)": 1.23,
-    "Br2(l) + 2e- → 2Br-(aq)": 1.09,
-    "NO3-(aq) + 4H+(aq) + 3e- → NO(g) + 2H2O(l)": 0.96,
-    "2H+(aq) + 2e- → H2(g)": 0.00,  # Reference half-reaction
-    "S(s) + 2H+(aq) + 2e- → H2S(g)": 0.14,
-    "Sn4+(aq) + 2e- → Sn2+(aq)": 0.15,
-    "SO4^2-(aq) + 4H+(aq) + 2e- → H2SO3(aq) + H2O(l)": 0.17,
-    "Cu2+(aq) + e- → Cu+(aq)": 0.16,
-    "I2(s) + 2e- → 2I-(aq)": 0.54,
-    
-    # Metals
-    "Ag+(aq) + e- → Ag(s)": 0.80,
-    "Hg2^2+(aq) + 2e- → 2Hg(l)": 0.79,
-    "Fe3+(aq) + e- → Fe2+(aq)": 0.77,
-    "O2(g) + 2H+(aq) + 2e- → H2O2(aq)": 0.70,
-    "MnO4-(aq) + e- → MnO4^2-(aq)": 0.56,
-    "I2(s) + 2e- → 2I-(aq)": 0.54,
-    "Cu+(aq) + e- → Cu(s)": 0.52,
-    "I3-(aq) + 2e- → 3I-(aq)": 0.53,
-    "Cu2+(aq) + 2e- → Cu(s)": 0.34,
-    "AgCl(s) + e- → Ag(s) + Cl-(aq)": 0.22,
-    "SO4^2-(aq) + 4H+(aq) + 2e- → SO2(g) + 2H2O(l)": 0.20,
-    "Cu2+(aq) + e- → Cu+(aq)": 0.16,
-    "Sn4+(aq) + 2e- → Sn2+(aq)": 0.15,
-    "S(s) + 2H+(aq) + 2e- → H2S(g)": 0.14,
-    "2H+(aq) + 2e- → H2(g)": 0.00,  # Reference half-reaction
-    "Pb2+(aq) + 2e- → Pb(s)": -0.13,
-    "Sn2+(aq) + 2e- → Sn(s)": -0.14,
-    "Ni2+(aq) + 2e- → Ni(s)": -0.25,
-    "Co2+(aq) + 2e- → Co(s)": -0.28,
-    "PbSO4(s) + 2e- → Pb(s) + SO4^2-(aq)": -0.35,
-    "Cd2+(aq) + 2e- → Cd(s)": -0.40,
-    "Fe2+(aq) + 2e- → Fe(s)": -0.44,
-    "Cr3+(aq) + e- → Cr2+(aq)": -0.41,
-    "Cr3+(aq) + 3e- → Cr(s)": -0.74,
-    "Zn2+(aq) + 2e- → Zn(s)": -0.76,
-    "Cr2+(aq) + 2e- → Cr(s)": -0.91,
-    "Mn2+(aq) + 2e- → Mn(s)": -1.18,
-    "Al3+(aq) + 3e- → Al(s)": -1.66,
-    "H2(g) + 2e- → 2H-(aq)": -2.25,
-    "Mg2+(aq) + 2e- → Mg(s)": -2.37,
-    "Na+(aq) + e- → Na(s)": -2.71,
-    "Ca2+(aq) + 2e- → Ca(s)": -2.87,
-    "Sr2+(aq) + 2e- → Sr(s)": -2.89,
-    "Ba2+(aq) + 2e- → Ba(s)": -2.90,
-    "K+(aq) + e- → K(s)": -2.93,
-    "Li+(aq) + e- → Li(s)": -3.05,
-}
-
-# Common metal symbols for quick lookup
-COMMON_METALS = {
-    "Li", "Na", "K", "Rb", "Cs", "Be", "Mg", "Ca", "Sr", "Ba", 
-    "Al", "Ga", "In", "Sn", "Pb", "Bi", "Fe", "Co", "Ni", "Cu", 
-    "Ag", "Au", "Zn", "Cd", "Hg", "Mn", "Tc", "Re", "Cr", "Mo", 
-    "W", "V", "Nb", "Ta", "Ti", "Zr", "Hf"
-}
-
-# Activity series (from most active/reactive to least)
-ACTIVITY_SERIES = [
-    "Li", "K", "Ba", "Sr", "Ca", "Na", "Mg", "Al", "Mn", "Zn", 
-    "Cr", "Fe", "Cd", "Co", "Ni", "Sn", "Pb", "H", "Cu", "Ag", 
-    "Hg", "Pt", "Au"
-]
+import math
+from chemistry_solver.redox_data import (
+    STANDARD_REDUCTION_POTENTIALS,
+    COMMON_METALS,
+    ACTIVITY_SERIES,
+    COMMON_REDOX_REACTIONS,
+    COMMON_OXIDIZING_AGENTS,
+    COMMON_REDUCING_AGENTS,
+    COMMON_REDOX_PAIRS,
+    get_half_reaction_potential,
+    get_redox_pair,
+    get_common_redox_reaction,
+    get_oxidizing_agent,
+    get_reducing_agent
+)
 
 
 def parse_redox_reaction(reaction):
@@ -88,6 +31,19 @@ def parse_redox_reaction(reaction):
     """
     # Clean and standardize the reaction
     reaction = reaction.replace("→", "->").replace("⟶", "->")
+    
+    # First check if this is a common redox reaction in our database
+    for name, data in COMMON_REDOX_REACTIONS.items():
+        if reaction in data["reaction"] or reaction in data["balanced_equation"]:
+            return {
+                "oxidizing_agent": get_oxidizing_agent_from_reaction(data),
+                "reducing_agent": get_reducing_agent_from_reaction(data),
+                "oxidation_half": data["oxidation_half"],
+                "reduction_half": data["reduction_half"],
+                "electron_transfer": get_electron_transfer_from_half_reaction(data["oxidation_half"]),
+                "is_common_reaction": True,
+                "common_name": name
+            }
     
     # Split into reactants and products
     parts = reaction.split("->")
@@ -123,6 +79,21 @@ def parse_redox_reaction(reaction):
     reduction_half = None
     electron_transfer = None
     
+    # Check if this matches any common redox pairs
+    for name, data in COMMON_REDOX_PAIRS.items():
+        if reaction in data["net_reaction"]:
+            return {
+                "oxidizing_agent": get_oxidizing_agent_from_pair(data),
+                "reducing_agent": get_reducing_agent_from_pair(data),
+                "oxidation_half": data["oxidation"],
+                "reduction_half": data["reduction"],
+                "electron_transfer": get_electron_transfer_from_half_reaction(data["oxidation"]),
+                "is_common_pair": True,
+                "common_name": name,
+                "e_cell": data["e_cell"],
+                "favorable": data["favorable"]
+            }
+    
     # Common case: metal displacement reaction (metal + metal ion -> metal ion + metal)
     if len(metal_reactants) == 1 and len(ion_reactants) == 1 and len(metal_products) == 1 and len(ion_products) == 1:
         # The metal reactant is being oxidized (losing electrons)
@@ -154,6 +125,63 @@ def parse_redox_reaction(reaction):
     }
 
 
+def get_oxidizing_agent_from_reaction(reaction_data):
+    """Helper function to extract oxidizing agent from reaction data"""
+    # In a common redox reaction, the species being reduced is the oxidizing agent
+    # It typically appears on the left side of the reduction half-reaction
+    reduction_half = reaction_data["reduction_half"]
+    parts = reduction_half.split("->")[0].strip().split("+")
+    return parts[0].strip()
+
+
+def get_reducing_agent_from_reaction(reaction_data):
+    """Helper function to extract reducing agent from reaction data"""
+    # In a common redox reaction, the species being oxidized is the reducing agent
+    # It typically appears on the left side of the oxidation half-reaction
+    oxidation_half = reaction_data["oxidation_half"]
+    parts = oxidation_half.split("->")[0].strip().split("+")
+    return parts[0].strip()
+
+
+def get_oxidizing_agent_from_pair(pair_data):
+    """Helper function to extract oxidizing agent from redox pair data"""
+    # In a redox pair, the species being reduced is the oxidizing agent
+    # It typically appears on the left side of the reduction half-reaction
+    reduction_half = pair_data["reduction"]
+    parts = reduction_half.split("->")[0].strip().split("+")
+    return parts[0].strip()
+
+
+def get_reducing_agent_from_pair(pair_data):
+    """Helper function to extract reducing agent from redox pair data"""
+    # In a redox pair, the species being oxidized is the reducing agent
+    # It typically appears on the left side of the oxidation half-reaction
+    oxidation_half = pair_data["oxidation"]
+    parts = oxidation_half.split("->")[0].strip().split("+")
+    return parts[0].strip()
+
+
+def get_electron_transfer_from_half_reaction(half_reaction):
+    """Extract the number of electrons transferred from a half-reaction"""
+    if "e-" in half_reaction or "e⁻" in half_reaction:
+        # Standardize the electron notation
+        half_reaction = half_reaction.replace("e⁻", "e-")
+        
+        # Try to extract the coefficient
+        parts = half_reaction.split("e-")
+        left_part = parts[0].strip()
+        
+        # Check if there's a number before e-
+        electron_part = left_part.split()[-1].strip()
+        if electron_part.isdigit():
+            return int(electron_part)
+        elif electron_part == "":
+            return 1  # Single electron with no coefficient
+    
+    # Default to 2 if we can't determine
+    return 2
+
+
 def find_standard_reduction_potential(half_reaction):
     """
     Find the standard reduction potential for a given half-reaction.
@@ -164,6 +192,11 @@ def find_standard_reduction_potential(half_reaction):
     Returns:
         float or None: Standard reduction potential in volts, or None if not found
     """
+    # Use the function from redox_data if possible
+    potential = get_half_reaction_potential(half_reaction)
+    if potential is not None:
+        return potential
+    
     # Try direct lookup
     if half_reaction in STANDARD_REDUCTION_POTENTIALS:
         return STANDARD_REDUCTION_POTENTIALS[half_reaction]
@@ -210,8 +243,65 @@ def determine_redox_favorability(reaction):
         dict: Results containing favorability information and calculation details
     """
     try:
-        # First try to parse the reaction
+        # First check if this is a common redox pair with known favorability
+        for name, data in COMMON_REDOX_PAIRS.items():
+            if reaction in data["net_reaction"]:
+                steps = [
+                    f"1. Identified reaction: {name} (common redox pair)",
+                    f"2. Oxidation half-reaction: {data['oxidation']}",
+                    f"3. Reduction half-reaction: {data['reduction']}",
+                    f"4. Standard cell potential: E°cell = {data['e_cell']} V",
+                    f"5. {'Favorable' if data['favorable'] else 'Not favorable'} reaction (E°cell {'>' if data['favorable'] else '<'} 0)"
+                ]
+                
+                return {
+                    "favorable": data["favorable"],
+                    "message": "Favorable" if data["favorable"] else "Not favorable",
+                    "oxidation_half": data["oxidation"],
+                    "reduction_half": data["reduction"],
+                    "e_cell": data["e_cell"],
+                    "steps": steps
+                }
+        
+        # Try to parse the reaction
         parsed = parse_redox_reaction(reaction)
+        
+        # Check if we identified a common reaction with parsed data
+        if parsed.get("is_common_reaction"):
+            common_name = parsed.get("common_name")
+            reaction_data = get_common_redox_reaction(common_name)
+            
+            # Try to calculate cell potential
+            reduction_half = reaction_data["reduction_half"]
+            oxidation_half = reaction_data["oxidation_half"]
+            
+            reduction_potential = find_standard_reduction_potential(reduction_half)
+            oxidation_potential = find_standard_reduction_potential(
+                oxidation_half.replace("->", "←").replace("2e-", "")
+            )
+            
+            if reduction_potential is not None and oxidation_potential is not None:
+                e_cell = reduction_potential - oxidation_potential
+                is_favorable = e_cell > 0
+                
+                steps = [
+                    f"1. Identified reaction: {common_name} (common redox reaction)",
+                    f"2. Oxidation half-reaction: {oxidation_half}",
+                    f"3. Reduction half-reaction: {reduction_half}",
+                    f"4. Standard reduction potential for reduction: {reduction_potential} V",
+                    f"5. Standard reduction potential for oxidation: {oxidation_potential} V",
+                    f"6. Standard cell potential: E°cell = {reduction_potential} V - ({oxidation_potential} V) = {e_cell} V",
+                    f"7. {'Favorable' if is_favorable else 'Not favorable'} reaction (E°cell {'>' if is_favorable else '<'} 0)"
+                ]
+                
+                return {
+                    "favorable": is_favorable,
+                    "message": "Favorable" if is_favorable else "Not favorable",
+                    "oxidation_half": oxidation_half,
+                    "reduction_half": reduction_half,
+                    "e_cell": e_cell,
+                    "steps": steps
+                }
         
         # For simple metal displacement, we can use activity series logic
         is_displacement = parsed["oxidizing_agent"] and parsed["reducing_agent"]
@@ -384,7 +474,7 @@ def calculate_nernst_equation(e_cell_standard, n, concentration_ratio, temperatu
     F = 96485  # C/mol
     
     # Calculate the Nernst equation
-    e_cell = e_cell_standard - ((R * temperature) / (n * F)) * 2.303 * log10(concentration_ratio)
+    e_cell = e_cell_standard - ((R * temperature) / (n * F)) * 2.303 * math.log10(concentration_ratio)
     
     return e_cell
 
@@ -414,9 +504,3 @@ def get_half_reaction_by_element(element, state=None):
             })
     
     return results
-
-
-def log10(x):
-    """Simple log10 implementation to avoid dependency on math module"""
-    import math
-    return math.log10(x)

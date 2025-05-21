@@ -3,7 +3,7 @@ Terminal User Interface for Molar Mass Calculations
 """
 from ui.terminal_ui import display_title, display_results_header, wait_for_user
 from chemistry_solver.molar_mass import calculate_molar_mass
-from chemical_name_to_formula import get_formula_from_name
+from chemistry_solver.name_to_formula import get_formula_from_name
 
 class MolarMassUI:
     """UI class for molar mass calculations."""

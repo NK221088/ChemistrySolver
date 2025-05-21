@@ -332,31 +332,6 @@ def calculate_vapor_pressure_lowering(P_pure, P_solution, solute_mass, solvent, 
         'steps': steps
     }
 
-def print_solution(result, property_type):
-    """
-    Print the solution steps for a colligative property calculation.
-    
-    Parameters:
-    -----------
-    result : dict
-        The result dictionary from a calculation function
-    property_type : str
-        The type of colligative property being calculated
-    """
-    if not result['success']:
-        print(f"Error: {result['error']}")
-        return
-        
-    print(f"{property_type} Solution:")
-    print("=" * (len(property_type) + 10))
-    
-    for step in result["steps"]:
-        print(step)
-    
-    print("\nResult:")
-    print(f"Molecular weight of unknown substance: {result['molecular_weight']:.2f} g/mol")
-    print(f"Closest answer choice: ~{result['closest_answer']} g/mol")
-
 def solve_freezing_point_problem(T_pure, T_solution, solvent, K_f=None, solute_mass=1, solvent_mass=None, ionization_factor=1):
     """
     Solve a freezing point depression problem.
@@ -399,4 +374,100 @@ def solve_freezing_point_problem(T_pure, T_solution, solvent, K_f=None, solute_m
     
     return calculate_freezing_point_depression(
         T_pure, T_solution, K_f, solute_mass, solvent, solvent_mass, ionization_factor
+    )
+
+def solve_boiling_point_problem(T_pure, T_solution, solvent, K_b=None, solute_mass=1, solvent_mass=None, ionization_factor=1):
+    """
+    Solve a boiling point elevation problem.
+    
+    Parameters:
+    -----------
+    T_pure : float
+        Boiling point of pure solvent in °C
+    T_solution : float
+        Boiling point of solution in °C
+    solvent : str
+        Chemical formula of the solvent
+    K_b : float, optional
+        Boiling point elevation constant in °C/m (if None, will look up from constants)
+    solute_mass : float, optional
+        Mass of solute in grams (default 1g)
+    solvent_mass : float, optional
+        Mass of solvent in grams (required)
+    ionization_factor : float, optional
+        van 't Hoff factor (default is 1 for non-electrolytes)
+    
+    Returns:
+    --------
+    dict
+        Result dictionary
+    """
+    if solvent_mass is None:
+        return {'success': False, 'error': "Solvent mass is required"}
+    
+    # Use lookup table for K_b if not provided
+    if K_b is None:
+        solvent_lower = solvent.lower()
+        for key, value in BOILING_POINT_CONSTANTS.items():
+            if key in solvent_lower or solvent_lower in key:
+                K_b = value
+                break
+        
+        if K_b is None:
+            return {'success': False, 'error': f"Boiling point constant not found for {solvent}"}
+    
+    return calculate_boiling_point_elevation(
+        T_pure, T_solution, K_b, solute_mass, solvent, solvent_mass, ionization_factor
+    )
+
+def solve_osmotic_pressure_problem(osmotic_pressure_atm, temperature_c, solution_volume_L, solute_mass, ionization_factor=1):
+    """
+    Solve an osmotic pressure problem.
+    
+    Parameters:
+    -----------
+    osmotic_pressure_atm : float
+        Osmotic pressure in atmospheres
+    temperature_c : float
+        Temperature in degrees Celsius
+    solution_volume_L : float
+        Volume of solution in liters
+    solute_mass : float
+        Mass of solute in grams
+    ionization_factor : float, optional
+        van 't Hoff factor (default is 1 for non-electrolytes)
+    
+    Returns:
+    --------
+    dict
+        Result dictionary
+    """
+    return calculate_osmotic_pressure(
+        osmotic_pressure_atm, temperature_c, solution_volume_L, solute_mass, ionization_factor
+    )
+
+def solve_vapor_pressure_problem(P_pure, P_solution, solute_mass, solvent, solvent_mass):
+    """
+    Solve a vapor pressure lowering problem.
+    
+    Parameters:
+    -----------
+    P_pure : float
+        Vapor pressure of pure solvent
+    P_solution : float
+        Vapor pressure of solution
+    solute_mass : float
+        Mass of solute in grams
+    solvent : str
+        Chemical formula of the solvent
+    solvent_mass : float
+        Mass of solvent in grams
+    
+    Returns:
+    --------
+    dict
+        Result dictionary
+    """
+    return calculate_vapor_pressure_lowering(
+        P_pure, P_solution, solute_mass, solvent, solvent_mass
     )

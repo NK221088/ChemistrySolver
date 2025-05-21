@@ -6,7 +6,7 @@ from chemistry_solver.thermodynamics import (calculate_heat, calculate_temperatu
                           calculate_molar_heat, solve_thermal_equilibrium, solve_thermal_equilibrium_with_molar_heat,
                           handle_heat_transfer_problem, handle_heat_transfer_with_molar_heat, solve_mixture_problem,
                           calculate_boiling_point_with_pressure, calculate_pressure_with_temperature, 
-                          calculate_heat_of_vaporization, parse_reaction_string, solve_enthalpy_problem)
+                          calculate_heat_of_vaporization, parse_reaction_string, solve_enthalpy_problem, solve_combustion_enthalpy)
 
 try:
     from chemistry_solver.molar_mass import calculate_molar_mass

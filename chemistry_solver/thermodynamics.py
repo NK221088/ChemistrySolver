@@ -649,11 +649,6 @@ def solve_mixture_problem(substances):
         "steps": steps
     }
 
-
-#######################################
-# Clausius-Clapeyron Equation Functions
-#######################################
-
 #######################################
 # Clausius-Clapeyron Equation Functions
 #######################################

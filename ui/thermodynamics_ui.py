@@ -6,7 +6,7 @@ from chemistry_solver.thermodynamics import (calculate_heat, calculate_temperatu
                           calculate_molar_heat, solve_thermal_equilibrium, solve_thermal_equilibrium_with_molar_heat,
                           handle_heat_transfer_problem, handle_heat_transfer_with_molar_heat, solve_mixture_problem,
                           calculate_boiling_point_with_pressure, calculate_pressure_with_temperature, 
-                          calculate_heat_of_vaporization)
+                          calculate_heat_of_vaporization, parse_reaction_string, solve_enthalpy_problem)
 
 try:
     from chemistry_solver.molar_mass import calculate_molar_mass
@@ -27,7 +27,7 @@ class ThermodynamicsUI:
         
         while True:
             self._display_menu()
-            choice = input("\nEnter choice (0-7): ").strip()
+            choice = input("\nEnter choice (0-8): ").strip()
             
             if choice == "0":
                 # Return to main menu
@@ -46,6 +46,8 @@ class ThermodynamicsUI:
                 self._handle_mixture_thermal_equilibrium()
             elif choice == "7":
                 self._handle_clausius_clapeyron_calculations()
+            elif choice == "8":
+                self._handle_hess_law_calculations()
             else:
                 print("Invalid choice. Please try again.")
             
@@ -61,6 +63,7 @@ class ThermodynamicsUI:
         [5] Solve thermal equilibrium with molar heat capacities
         [6] Solve multi-substance thermal equilibrium problem
         [7] Clausius-Clapeyron equation calculations
+        [8] Hess's Law calculations
         [0] Return to main menu
         """
         print(menu)
@@ -334,6 +337,83 @@ class ThermodynamicsUI:
                 print(step)
             
             print(f"\nThe heat of vaporization is {result['heat_of_vaporization']:.2f} kJ/mol")
+            
+        else:
+            print("Invalid choice.")
+            
+    def _handle_hess_law_calculations(self):
+        """
+        Handler function for Hess's Law calculations.
+        """
+        print("\n=== Hess's Law Calculations ===")
+        print("This will calculate enthalpy changes using Hess's Law.")
+        print("\nYou have two options:")
+        print("[1] Enter individual reactions")
+        print("[2] Enter a complete problem")
+        
+        choice = input("\nEnter choice (1-2): ").strip()
+        
+        if choice == "1":
+            # Manual entry of individual reactions
+            print("\n--- Enter Known Reactions ---")
+            print("For each reaction, use the format: 'reactants → products ΔH° = value'")
+            print("Example: 'C (graphite) + O2 (g) → CO2 (g) ΔH° = -393.5 kJ/mol'")
+            
+            known_reactions = []
+            num_known = int(input("\nHow many known reactions do you want to enter? "))
+            
+            for i in range(num_known):
+                reaction_str = input(f"Reaction {i+1}: ")
+                try:
+                    reaction = parse_reaction_string(reaction_str)
+                    known_reactions.append(reaction)
+                    print(f"Parsed: {reaction}")
+                except ValueError as e:
+                    print(f"Error parsing reaction: {e}")
+                    print("Please try again.")
+                    reaction_str = input(f"Reaction {i+1}: ")
+                    reaction = parse_reaction_string(reaction_str)
+                    known_reactions.append(reaction)
+            
+            print("\n--- Enter Target Reaction ---")
+            print("Enter the reaction for which you want to calculate the enthalpy change:")
+            target_str = input("Target reaction: ")
+            target_reaction = parse_reaction_string(target_str)
+            
+            # Calculate the result
+            result = solve_combustion_enthalpy(known_reactions, target_reaction)
+            
+            display_results_header()
+            for step in result["steps"]:
+                print(step)
+            
+        elif choice == "2":
+            # Complete problem entry
+            print("\n--- Enter Complete Problem ---")
+            print("Enter the complete problem with all reactions (one per line).")
+            print("The reaction without an enthalpy value will be considered the target.")
+            print("Example:")
+            print("C (graphite) + O2 (g) → CO2 (g) ΔH° = -393.5 kJ/mol")
+            print("H2 (g) + 1/2 O2 (g) → H2O (l) ΔH° = -285.8 kJ/mol")
+            print("CH3OH (l) → C (graphite) + 2 H2 (g) + 1/2 O2 (g) ΔH° = 239.0 kJ/mol")
+            print("CH3OH (l) + 3/2 O2 (g) → CO2 (g) + 2 H2O (l)")
+            
+            print("\nEnter your problem (end with a blank line):")
+            problem_lines = []
+            while True:
+                line = input()
+                if not line:
+                    break
+                problem_lines.append(line)
+            
+            problem_text = "\n".join(problem_lines)
+            
+            # Solve the problem
+            result = solve_enthalpy_problem(problem_text)
+            
+            display_results_header()
+            for step in result["steps"]:
+                print(step)
             
         else:
             print("Invalid choice.")

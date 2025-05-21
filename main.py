@@ -13,7 +13,8 @@ from ui.acid_base_ui import AcidBaseUI
 from ui.name_to_formula_ui import NameToFormulaUI
 from ui.stoichiometry_ui import StoichiometryUI
 from ui.functional_groups_ui import FunctionalGroupsUI
-from ui.colligative_properties_ui import ColligativePropertiesUI  # Added import for the new module
+from ui.colligative_properties_ui import ColligativePropertiesUI
+from ui.insoluble_salts_ui import InsolubleSaltsUI  # Add import for the newly structured module
 
 def main():
     """Main application entry point."""
@@ -72,6 +73,10 @@ def main():
             # Launch Colligative Properties Calculator module
             colligative_ui = ColligativePropertiesUI()
             colligative_ui.run()
+        elif choice == "11":
+            # Launch Insoluble Salts & Qualitative Analysis module
+            insoluble_salts_ui = InsolubleSaltsUI()
+            insoluble_salts_ui.run()
         # Add more modules as needed
         else:
             print("Invalid choice. Please try again.")

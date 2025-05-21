@@ -26,7 +26,8 @@ def display_main_menu():
     print("  [7] Name to Formula Converter")
     print("  [8] Stoichiometry Calculator")
     print("  [9] Functional Groups Analyzer")
-    print("  [10] Colligative Properties Calculator")  # Added option for Colligative Properties module
+    print("  [10] Colligative Properties Calculator")
+    print("  [11] Insoluble Salts & Qualitative Analysis")  # Added option for Insoluble Salts module
     print("  [0] Exit")
 
 def get_user_choice():

@@ -292,75 +292,20 @@ def analyze_specific_scenario(scenario_id):
     else:
         return {"error": f"Scenario {scenario_id} not found"}
 
-def handle_qualitative_analysis():
+def get_available_cations():
     """
-    Interactive CLI function for solving qualitative analysis problems.
+    Get a list of all available cations in the database.
+    
+    Returns:
+        list: List of cation names
     """
-    print("\n=== Qualitative Analysis Problem Solver ===")
-    
-    # Print available cations and reagents
-    print("\nAvailable cations:")
-    print(", ".join(SOLUBILITY_DATA.keys()))
-    
-    print("\nAvailable reagents:")
-    print(", ".join(REAGENTS.keys()))
-    
-    # Get candidate cations
-    cation_input = input("\nEnter possible cations (comma-separated): ")
-    cation_candidates = [c.strip() for c in cation_input.split(",")]
-    
-    # Get reagents that cause precipitation
-    precip_input = input("Enter reagents that cause precipitation (comma-separated): ")
-    if precip_input.strip():
-        precipitates_with = [r.strip() for r in precip_input.split(",")]
-    else:
-        precipitates_with = []
-    
-    # Get reagents that DON'T cause precipitation
-    no_precip_input = input("Enter reagents that DON'T cause precipitation (comma-separated): ")
-    if no_precip_input.strip():
-        no_precipitate_with = [r.strip() for r in no_precip_input.split(",")]
-    else:
-        no_precipitate_with = []
-    
-    # Solve the problem
-    result = solve_qualitative_analysis_problem(
-        cation_candidates,
-        precipitates_with,
-        no_precipitate_with
-    )
-    
-    # Display results
-    print("\n=== Analysis Results ===")
-    
-    if "error" in result:
-        print(f"Error: {result['error']}")
-        if "available_cations" in result:
-            print("Available cations:", ", ".join(result["available_cations"]))
-        if "available_reagents" in result:
-            print("Available reagents:", ", ".join(result["available_reagents"]))
-        return
-    
-    print("\nAnalysis steps:")
-    for step in result["steps"]:
-        print(step)
-    
-    print("\nConclusion:")
-    print(result["conclusion"])
-    
-    if result["identified_cations"]:
-        print("\nIdentified cation(s):", ", ".join(result["identified_cations"]))
-    else:
-        print("\nNo cation could be identified with the given constraints.")
+    return list(SOLUBILITY_DATA.keys())
 
-if __name__ == "__main__":
-    # Test with the W20_8 problem
-    result = analyze_specific_scenario("W20_8")
+def get_available_reagents():
+    """
+    Get a list of all available reagents in the database.
     
-    print("\n=== Qualitative Analysis Results ===")
-    print("\nAnalysis steps:")
-    for step in result["steps"]:
-        print(step)
-    
-    print("\nConclusion:")
-    print(result["conclusion"])
+    Returns:
+        list: List of reagent names
+    """
+    return list(REAGENTS.keys())

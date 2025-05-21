@@ -16,7 +16,8 @@ from ui.functional_groups_ui import FunctionalGroupsUI
 from ui.colligative_properties_ui import ColligativePropertiesUI
 from ui.insoluble_salts_ui import InsolubleSaltsUI
 from ui.oxidation_state_ui import OxidationStateUI
-from ui.redox_ui import RedoxUI  # Import our new redox UI module
+from ui.redox_ui import RedoxUI
+from ui.gas_concentration_ui import GasConcentrationUI  # Import the new gas concentration UI module
 
 def main():
     """Main application entry point."""
@@ -87,6 +88,10 @@ def main():
             # Launch Redox Reactions Analyzer module
             redox_ui = RedoxUI()
             redox_ui.run()
+        elif choice == "14":
+            # Launch Gas Concentration Calculator module
+            gas_concentration_ui = GasConcentrationUI()
+            gas_concentration_ui.run()
         # Add more modules as needed
         else:
             print("Invalid choice. Please try again.")

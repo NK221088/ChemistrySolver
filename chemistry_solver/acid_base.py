@@ -504,3 +504,4 @@ def analyze_weak_acid_question(options, initial_concentration=1.0, formula="HX",
                  f"the equilibrium concentrations are: [H⁺] = {h_concentration:.4e} M, "
                  f"[X⁻] = {x_concentration:.4e} M, [HX] = {hx_concentration:.4e} M, pH = {ph:.4f}"
     }
+    

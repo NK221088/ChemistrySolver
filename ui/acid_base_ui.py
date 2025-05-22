@@ -8,6 +8,12 @@ from chemistry_solver.acid_base import (
     AcidBaseEquilibrium,
     analyze_weak_acid_question
 )
+# Import the new solubility equilibrium functions
+from chemistry_solver.solubility_pH_extension import (
+    solve_hydroxide_salt_pH,
+    solve_ksp_from_pH,
+    analyze_salt_solubility_questions
+)
 
 class AcidBaseUI:
     """UI class for acid-base chemistry analysis."""
@@ -22,7 +28,7 @@ class AcidBaseUI:
         
         while True:
             self._display_menu()
-            choice = input("\nEnter choice (0-6): ").strip()
+            choice = input("\nEnter choice (0-8): ").strip()
             
             if choice == "0":
                 # Return to main menu
@@ -39,6 +45,10 @@ class AcidBaseUI:
                 self._handle_acid_statement_verification()
             elif choice == "6":
                 self._handle_acid_base_info()
+            elif choice == "7":
+                self._handle_salt_pH_calculation()
+            elif choice == "8":
+                self._handle_ksp_from_pH()
             else:
                 print("Invalid choice. Please try again.")
             
@@ -53,6 +63,8 @@ class AcidBaseUI:
         [4] Calculate weak base equilibrium
         [5] Verify statements about weak acid solutions
         [6] Learn about acid-base theory
+        [7] Calculate pH from solubility product (Ksp)
+        [8] Calculate solubility product (Ksp) from pH
         [0] Return to main menu
         """
         print(menu)
@@ -325,6 +337,133 @@ Equilibrium Concepts:
 - Kb: Base dissociation constant, higher Kb = stronger base
 - Ka × Kb = Kw = 1.0 × 10^-14 at 25°C (for conjugate acid-base pairs)
 - pH = -log[H+], pOH = -log[OH-], pH + pOH = 14 at 25°C
+
+Solubility Product (Ksp):
+- Describes the equilibrium between a solid salt and its constituent ions in solution
+- For a salt MₓXᵧ: MₓXᵧ(s) ⇌ xMⁿ⁺(aq) + yXᵐ⁻(aq)
+- Ksp = [Mⁿ⁺]ˣ[Xᵐ⁻]ʸ
+- Used to calculate solubility of sparingly soluble salts
+- Smaller Ksp values indicate lower solubility
         """
         
         print(info)
+
+    def _handle_salt_pH_calculation(self):
+        """Handle pH calculation from solubility product (Ksp)."""
+        print("\n===== SOLUBILITY PRODUCT pH CALCULATOR =====")
+        print("This tool calculates pH of a solution saturated with a sparingly soluble salt")
+        
+        try:
+            formula = input("Enter salt formula (e.g., Mg(OH)2, Ca(OH)2): ").strip()
+            if not formula:
+                print("Error: Formula cannot be empty.")
+                return
+            
+            # Check if formula contains hydroxide
+            if "OH" not in formula:
+                print("Note: This calculation currently works best for metal hydroxides.")
+                print("Continuing with calculation, but results may not be accurate for non-hydroxide salts.")
+            
+            # Get Ksp value
+            try:
+                ksp_input = input("Enter Ksp value (scientific notation OK, e.g., 5.61e-12): ").strip()
+                ksp_value = float(ksp_input)
+            except ValueError:
+                print("Invalid Ksp value. Using 1.0e-10 as default.")
+                ksp_value = 1.0e-10
+            
+            # Calculate pH using the imported function
+            result = solve_hydroxide_salt_pH(formula, ksp_value)
+            
+            if "error" in result:
+                print(f"Error: {result['error']}")
+                return
+            
+            display_results_header()
+            print(f"pH Calculation for Saturated {formula} Solution")
+            print("-" * 50)
+            print(f"Salt formula: {formula}")
+            print(f"Ksp value: {ksp_value:.2e}")
+            print(f"Metal: {result['metal']}")
+            print(f"Hydroxide groups: {result['hydroxide_groups']}")
+            print("-" * 50)
+            print(f"Solubility: {result['solubility']:.2e} mol/L")
+            print(f"[{result['metal']}²⁺]: {result['metal_ion_concentration']:.2e} mol/L")
+            print(f"[OH⁻]: {result['hydroxide_concentration']:.2e} mol/L")
+            print(f"pOH: {result['poh']:.4f}")
+            print(f"pH: {result['ph']:.4f}")
+            
+            # If it's the specific problem from the example, show the answer options
+            if formula.lower() == "mg(oh)2" and abs(ksp_value - 5.61e-12) < 1e-13:
+                print("\nFor the multiple-choice question:")
+                options = ["~8.4", "~9.4", "~10.4", "~11.4", "~12.4"]
+                closest_option = None
+                smallest_diff = float('inf')
+                
+                print("Options analysis:")
+                for i, option_str in enumerate(options):
+                    # Extract numeric value
+                    import re
+                    ph_match = re.search(r"~?\s*(\d+\.\d+)", option_str)
+                    if ph_match:
+                        option_ph = float(ph_match.group(1))
+                        diff = abs(option_ph - result['ph'])
+                        
+                        if diff < smallest_diff:
+                            smallest_diff = diff
+                            closest_option = i
+                        
+                        print(f"  {option_str}: {'✓' if diff < 0.1 else '✗'} (diff: {diff:.4f})")
+                
+                print(f"\nThe calculated pH is {result['ph']:.4f}, closest to option: {options[closest_option]}")
+                
+        except Exception as e:
+            print(f"Error: {str(e)}")
+    
+    def _handle_ksp_from_pH(self):
+        """Handle calculation of solubility product (Ksp) from pH."""
+        print("\n===== SOLUBILITY PRODUCT FROM pH =====")
+        print("This tool calculates Ksp from the pH of a saturated salt solution")
+        
+        try:
+            formula = input("Enter salt formula (e.g., Mg(OH)2, Ca(OH)2): ").strip()
+            if not formula:
+                print("Error: Formula cannot be empty.")
+                return
+            
+            # Check if formula contains hydroxide
+            if "OH" not in formula:
+                print("Note: This calculation currently works best for metal hydroxides.")
+                print("Continuing with calculation, but results may not be accurate for non-hydroxide salts.")
+            
+            # Get pH value
+            try:
+                ph_input = input("Enter pH value of the saturated solution: ").strip()
+                ph_value = float(ph_input)
+            except ValueError:
+                print("Invalid pH value. Using 10.0 as default.")
+                ph_value = 10.0
+            
+            # Calculate Ksp using the imported function
+            result = solve_ksp_from_pH(formula, ph_value)
+            
+            if "error" in result:
+                print(f"Error: {result['error']}")
+                return
+            
+            display_results_header()
+            print(f"Ksp Calculation for {formula} from pH")
+            print("-" * 50)
+            print(f"Salt formula: {formula}")
+            print(f"Input pH: {ph_value:.4f}")
+            print(f"Metal: {result['metal']}")
+            print(f"Hydroxide groups: {result['hydroxide_groups']}")
+            print("-" * 50)
+            print(f"Calculated pOH: {result['poh']:.4f}")
+            print(f"[OH⁻]: {result['hydroxide_concentration']:.2e} mol/L")
+            print(f"Solubility: {result['solubility']:.2e} mol/L")
+            print(f"[{result['metal']}²⁺]: {result['metal_ion_concentration']:.2e} mol/L")
+            print(f"Calculated Ksp: {result['ksp']:.2e}")
+                
+        except Exception as e:
+            print(f"Error: {str(e)}")

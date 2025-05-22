@@ -10,7 +10,8 @@ from chemistry_solver.redox_reactions import (
     find_standard_reduction_potential,
     calculate_nernst_equation,
     get_common_redox_reaction,
-    get_redox_pair
+    get_redox_pair,
+    enhanced_determine_redox_favorability,
 )
 
 class RedoxUI:
@@ -66,10 +67,12 @@ class RedoxUI:
         
         try:
             print("Enter a redox reaction (use -> for reaction arrow)")
-            print("Example: Zn(s) + Cu2+(aq) -> Zn2+(aq) + Cu(s)")
+            print("Example 1: Zn(s) + Cu2+(aq) -> Zn2+(aq) + Cu(s)")
+            print("Example 2: SO2 + MnO4- + H2O -> SO4^2- + Mn2+ + H+")
             reaction = input("Reaction: ")
             
-            result = determine_redox_favorability(reaction)
+            # Use the enhanced parser for complex reactions
+            result = enhanced_determine_redox_favorability(reaction)
             
             display_results_header()
             if result['favorable'] is not None:
@@ -83,13 +86,73 @@ class RedoxUI:
                 if 'reduction_half' in result and result['reduction_half']:
                     print(f"Reduction half-reaction: {result['reduction_half']}")
                 
+                # Check if balanced equation is available
+                if 'balanced_equation' in result and result['balanced_equation']:
+                    print(f"Balanced equation: {result['balanced_equation']}")
+                
+                # Display oxidizing and reducing agents if available
+                if 'oxidizing_agent' in result and result['oxidizing_agent']:
+                    print(f"Oxidizing agent: {result['oxidizing_agent']}")
+                
+                if 'reducing_agent' in result and result['reducing_agent']:
+                    print(f"Reducing agent: {result['reducing_agent']}")
+                
                 # Check if e_cell is available in the result
                 if 'e_cell' in result:
                     print(f"Standard cell potential: {result['e_cell']:.3f} V")
                 
+                # Display notes if available
+                if 'notes' in result and result['notes']:
+                    print(f"\nNotes: {result['notes']}")
+                
                 display_steps(result['steps'])
             else:
                 print(f"Unable to automatically analyze: {result.get('message', 'Insufficient information')}")
+                
+                # For complex reactions that need manual completion
+                if 'oxidation_half' in result and result['oxidation_half'].startswith('[Please'):
+                    print("\nThis appears to be a complex redox reaction that requires manual balancing.")
+                    print("Would you like help with balancing this reaction manually? (y/n)")
+                    help_choice = input("> ").strip().lower()
+                    
+                    if help_choice == 'y':
+                        print("\n===== MANUAL REDOX REACTION BALANCING =====")
+                        print("Follow these steps to balance your complex redox reaction:")
+                        print("1. Identify what's being oxidized and reduced (look at oxidation states)")
+                        print("2. Write separate half-reactions for oxidation and reduction")
+                        print("3. Balance atoms other than O and H in each half-reaction")
+                        print("4. Balance O by adding H2O")
+                        print("5. Balance H by adding H+")
+                        print("6. Balance charge by adding electrons")
+                        print("7. Multiply half-reactions to equalize electrons transferred")
+                        print("8. Add the half-reactions together and cancel out common terms")
+                        
+                        print("\nFor your reaction:", reaction)
+                        print("Let's identify the species involved:")
+                        
+                        # Try to identify reactants and products
+                        parts = reaction.split("->")
+                        if len(parts) == 2:
+                            reactants = parts[0].strip().split("+")
+                            products = parts[1].strip().split("+")
+                            
+                            print("\nReactants:", ", ".join(r.strip() for r in reactants))
+                            print("Products:", ", ".join(p.strip() for p in products))
+                            
+                            # For permanganate reactions with SO2 (like your example)
+                            if any("MnO4" in r for r in reactants) and any("SO2" in r for r in reactants):
+                                print("\nThis appears to be the oxidation of sulfur dioxide by permanganate.")
+                                print("Oxidation half-reaction: SO2 + 2H2O → SO4²⁻ + 4H⁺ + 2e⁻")
+                                print("Reduction half-reaction: MnO4⁻ + 8H⁺ + 5e⁻ → Mn²⁺ + 4H2O")
+                                print("\nTo balance electrons: multiply oxidation by 5 and reduction by 2")
+                                print("5(SO2 + 2H2O → SO4²⁻ + 4H⁺ + 2e⁻)")
+                                print("2(MnO4⁻ + 8H⁺ + 5e⁻ → Mn²⁺ + 4H2O)")
+                                print("\nAdd these equations:")
+                                print("5SO2 + 10H2O + 2MnO4⁻ + 16H⁺ → 5SO4²⁻ + 20H⁺ + 2Mn²⁺ + 8H2O")
+                                print("\nSimplify (cancel 16H⁺ and 8H2O):")
+                                print("5SO2 + 2H2O + 2MnO4⁻ → 5SO4²⁻ + 4H⁺ + 2Mn²⁺")
+                                print("\nFinal balanced equation: 5SO2 + 2MnO4⁻ + 2H2O → 5SO4²⁻ + 4H⁺ + 2Mn²⁺")
+                
                 print("\nWould you like to enter the half-reactions manually? (y/n)")
                 choice = input("> ").strip().lower()
                 

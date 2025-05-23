@@ -1,27 +1,37 @@
 """
-Enhanced Terminal User Interface for Chemistry Calculations
-Includes molar mass, atom counting, and Avogadro's number calculations
+Enhanced Terminal User Interface for Molar Mass and Chemistry Calculations
+Properly integrated with the enhanced molar mass calculator module
 """
 from ui.terminal_ui import display_title, display_results_header, wait_for_user
-from chemistry_solver.molar_mass import calculate_molar_mass
-from chemistry_solver.name_to_formula import get_formula_from_name
+from chemistry_solver.molar_mass import (
+    calculate_molar_mass, 
+    count_atoms_in_formula,
+    calculate_atoms_from_mass,
+    calculate_mass_from_atoms,
+    solve_isopropanol_problem,
+    AVOGADROS_NUMBER
+)
 
-# Enhanced functions (would be imported from enhanced molar_mass module)
-AVOGADROS_NUMBER = 6.022e23
+# Try to import name_to_formula, but don't fail if it doesn't exist
+try:
+    from chemistry_solver.name_to_formula import get_formula_from_name
+    NAME_TO_FORMULA_AVAILABLE = True
+except ImportError:
+    NAME_TO_FORMULA_AVAILABLE = False
 
-class EnhancedChemistryUI:
-    """Enhanced UI class for comprehensive chemistry calculations."""
+class MolarMassUI:
+    """Enhanced UI class for comprehensive molar mass and chemistry calculations."""
     
     def __init__(self):
-        self.title = "ENHANCED CHEMISTRY CALCULATOR"
+        self.title = "MOLAR MASS & CHEMISTRY CALCULATOR"
     
     def run(self):
-        """Run the enhanced chemistry UI."""
+        """Run the molar mass and chemistry UI."""
         display_title(self.title)
         
         while True:
             self._display_main_menu()
-            choice = input("\nEnter choice (0-6): ").strip()
+            choice = input("\nEnter choice (0-7): ").strip()
             
             if choice == "0":
                 return
@@ -36,7 +46,12 @@ class EnhancedChemistryUI:
             elif choice == "5":
                 self._handle_problem_solver()
             elif choice == "6":
-                self._handle_name_to_formula()
+                self._handle_isopropanol_example()
+            elif choice == "7":
+                if NAME_TO_FORMULA_AVAILABLE:
+                    self._handle_name_to_formula()
+                else:
+                    print("Name to formula converter not available.")
             else:
                 print("Invalid choice. Please try again.")
             
@@ -45,14 +60,20 @@ class EnhancedChemistryUI:
     def _display_main_menu(self):
         """Display the main menu."""
         menu = """
-        [1] Calculate molar mass from formula
-        [2] Count atoms in formula
-        [3] Calculate number of atoms from mass
-        [4] Calculate mass from number of atoms
-        [5] Solve chemistry problems (like exam questions)
-        [6] Convert chemical name to formula
-        [0] Exit
-        """
+Available Functions:
+  [1] Calculate molar mass from formula
+  [2] Count atoms in formula
+  [3] Calculate number of atoms from mass
+  [4] Calculate mass from number of atoms
+  [5] Chemistry problem solver (custom problems)
+  [6] Isopropanol example problem
+  [7] Convert chemical name to formula"""
+        
+        if not NAME_TO_FORMULA_AVAILABLE:
+            menu += " (unavailable)"
+        
+        menu += "\n  [0] Return to main menu"
+        
         print(menu)
     
     def _handle_molar_mass(self):
@@ -60,7 +81,11 @@ class EnhancedChemistryUI:
         print("\n===== MOLAR MASS CALCULATOR =====")
         
         try:
-            formula = input("Enter chemical formula: ").strip()
+            formula = input("Enter chemical formula (e.g., H2O, C6H12O6, CaCl2): ").strip()
+            if not formula:
+                print("No formula entered.")
+                return
+                
             result = calculate_molar_mass(formula)
             
             display_results_header()
@@ -70,9 +95,9 @@ class EnhancedChemistryUI:
                 print(f"Molar Mass: {result['molar_mass']:.4f} g/mol")
                 print(f"Monoisotopic Mass: {result['monoisotopic_mass']:.4f} u")
                 print("\nElement Composition:")
-                print("-" * 60)
+                print("-" * 65)
                 print(f"{'Element':<10} {'Count':<8} {'Atomic Mass':<15} {'Contribution':<15}")
-                print("-" * 60)
+                print("-" * 65)
                 for e in result['composition']:
                     print(f"{e['element']:<10} {e['count']:<8} {e['atomic_mass']:.4f} u      {e['contribution']:.4f} g/mol")
             else:
@@ -85,14 +110,17 @@ class EnhancedChemistryUI:
         print("\n===== ATOM COUNTER =====")
         
         try:
-            formula = input("Enter chemical formula: ").strip()
+            formula = input("Enter chemical formula (e.g., C3H8O): ").strip()
+            if not formula:
+                print("No formula entered.")
+                return
+                
             element = input("Enter specific element (or press Enter for all atoms): ").strip()
             
             if not element:
                 element = None
             
-            # This would call the enhanced function
-            result = self._count_atoms_in_formula(formula, element)
+            result = count_atoms_in_formula(formula, element)
             
             display_results_header()
             if result['success']:
@@ -117,13 +145,22 @@ class EnhancedChemistryUI:
         
         try:
             formula = input("Enter chemical formula: ").strip()
-            mass = float(input("Enter mass in grams: "))
+            if not formula:
+                print("No formula entered.")
+                return
+                
+            mass_input = input("Enter mass in grams: ").strip()
+            if not mass_input:
+                print("No mass entered.")
+                return
+                
+            mass = float(mass_input)
             element = input("Enter specific element (or press Enter for total atoms): ").strip()
             
             if not element:
                 element = None
             
-            result = self._calculate_atoms_from_mass(formula, mass, element)
+            result = calculate_atoms_from_mass(formula, mass, element)
             
             display_results_header()
             if result['success']:
@@ -133,9 +170,11 @@ class EnhancedChemistryUI:
                 print(f"Moles: {result['moles']:.6f} mol")
                 print(f"{result['element'].capitalize()} atoms per molecule: {result['atoms_per_molecule']}")
                 print(f"Total {result['element']} atoms: {result['total_atoms']:.3e}")
-                print(f"Answer: {result['total_atoms']:.2e} atoms")
+                print(f"\nAnswer: {result['total_atoms']:.2e} atoms")
             else:
                 print(f"Error: {result['error']}")
+        except ValueError:
+            print("Error: Invalid mass value. Please enter a number.")
         except Exception as e:
             print(f"Error: {str(e)}")
     
@@ -145,13 +184,22 @@ class EnhancedChemistryUI:
         
         try:
             formula = input("Enter chemical formula: ").strip()
-            num_atoms = float(input("Enter number of atoms (can use scientific notation like 1.5e23): "))
+            if not formula:
+                print("No formula entered.")
+                return
+                
+            atoms_input = input("Enter number of atoms (can use scientific notation like 1.5e23): ").strip()
+            if not atoms_input:
+                print("No atom count entered.")
+                return
+                
+            num_atoms = float(atoms_input)
             element = input("Enter specific element (or press Enter for total atoms): ").strip()
             
             if not element:
                 element = None
             
-            result = self._calculate_mass_from_atoms(formula, num_atoms, element)
+            result = calculate_mass_from_atoms(formula, num_atoms, element)
             
             display_results_header()
             if result['success']:
@@ -161,64 +209,128 @@ class EnhancedChemistryUI:
                 print(f"Number of molecules: {result['molecules']:.3e}")
                 print(f"Moles: {result['moles']:.6f} mol")
                 print(f"Molar Mass: {result['molar_mass']:.4f} g/mol")
-                print(f"Mass: {result['mass_grams']:.4f} g")
+                print(f"\nMass: {result['mass_grams']:.4f} g")
             else:
                 print(f"Error: {result['error']}")
+        except ValueError:
+            print("Error: Invalid number format. Please enter a valid number.")
         except Exception as e:
             print(f"Error: {str(e)}")
     
     def _handle_problem_solver(self):
-        """Handle specific chemistry problems like exam questions."""
+        """Handle custom chemistry problems."""
         print("\n===== CHEMISTRY PROBLEM SOLVER =====")
         print("This section helps solve problems involving Avogadro's number")
         print("Example: 'How many hydrogen atoms are in 36.25g of isopropanol?'")
         
         try:
-            problem_type = input("\nProblem type:\n[1] Atoms in given mass\n[2] Mass from given atoms\n[3] Isopropanol example\nChoice: ").strip()
+            problem_type = input("\nProblem type:\n[1] Find atoms from mass\n[2] Find mass from atoms\nChoice: ").strip()
             
             if problem_type == "1":
                 formula = input("Enter chemical formula: ").strip()
-                mass = float(input("Enter mass in grams: "))
+                if not formula:
+                    print("No formula entered.")
+                    return
+                    
+                mass_input = input("Enter mass in grams: ").strip()
+                if not mass_input:
+                    print("No mass entered.")
+                    return
+                    
+                mass = float(mass_input)
                 element = input("Enter element to count: ").strip()
+                if not element:
+                    print("No element entered.")
+                    return
                 
-                result = self._calculate_atoms_from_mass(formula, mass, element)
+                result = calculate_atoms_from_mass(formula, mass, element)
                 
                 display_results_header()
                 if result['success']:
                     print(f"PROBLEM: How many {element} atoms are in {mass}g of {formula}?")
-                    print(f"\nSOLUTION:")
+                    print(f"\nSOLUTION STEPS:")
                     print(f"1. Formula: {formula}")
                     print(f"2. Molar mass: {result['molar_mass']:.4f} g/mol")
                     print(f"3. Moles = {mass}g ÷ {result['molar_mass']:.4f} g/mol = {result['moles']:.6f} mol")
                     print(f"4. {element} atoms per molecule: {result['atoms_per_molecule']}")
                     print(f"5. Total atoms = {result['moles']:.6f} mol × {AVOGADROS_NUMBER:.3e} × {result['atoms_per_molecule']}")
-                    print(f"\nANSWER: {result['total_atoms']:.2e} {element} atoms")
-                    
-                    # Show multiple choice format
-                    print(f"\nIn scientific notation: {result['total_atoms']:.2e}")
+                    print(f"\nFINAL ANSWER: {result['total_atoms']:.2e} {element} atoms")
                 else:
                     print(f"Error: {result['error']}")
             
-            elif problem_type == "3":
-                # Solve the isopropanol problem from the question
-                result = self._solve_isopropanol_problem()
+            elif problem_type == "2":
+                formula = input("Enter chemical formula: ").strip()
+                if not formula:
+                    print("No formula entered.")
+                    return
+                    
+                atoms_input = input("Enter number of atoms: ").strip()
+                if not atoms_input:
+                    print("No atom count entered.")
+                    return
+                    
+                num_atoms = float(atoms_input)
+                element = input("Enter element: ").strip()
+                if not element:
+                    element = None
+                
+                result = calculate_mass_from_atoms(formula, num_atoms, element)
                 
                 display_results_header()
                 if result['success']:
-                    print("ISOPROPANOL PROBLEM (from your question):")
-                    print(f"Problem: {result['problem']}")
-                    print(f"\nSOLUTION:")
-                    print(f"1. Isopropanol formula: {result['formula']} (C₃H₈O)")
-                    print(f"2. Molar mass: {result['molar_mass']:.4f} g/mol")
-                    print(f"3. Moles = {result['mass_grams']}g ÷ {result['molar_mass']:.4f} g/mol = {result['moles']:.6f} mol")
-                    print(f"4. Hydrogen atoms per molecule: {result['hydrogen_atoms_per_molecule']}")
-                    print(f"5. Total H atoms = {result['moles']:.6f} mol × {AVOGADROS_NUMBER:.3e} × {result['hydrogen_atoms_per_molecule']}")
-                    print(f"\nANSWER: {result['scientific_notation']} H atoms")
-                    
-                    print(f"\nThis matches choice (C): 2.90 × 10²⁴ H atoms")
+                    print(f"PROBLEM: What mass contains {num_atoms:.2e} {element or 'total'} atoms of {formula}?")
+                    print(f"\nSOLUTION STEPS:")
+                    print(f"1. Formula: {formula}")
+                    print(f"2. {result['element'].capitalize()} atoms per molecule: {result['atoms_per_molecule']}")
+                    print(f"3. Molecules = {num_atoms:.2e} ÷ {result['atoms_per_molecule']} = {result['molecules']:.3e}")
+                    print(f"4. Moles = {result['molecules']:.3e} ÷ {AVOGADROS_NUMBER:.3e} = {result['moles']:.6f} mol")
+                    print(f"5. Mass = {result['moles']:.6f} mol × {result['molar_mass']:.4f} g/mol")
+                    print(f"\nFINAL ANSWER: {result['mass_grams']:.4f} g")
                 else:
                     print(f"Error: {result['error']}")
+            else:
+                print("Invalid choice.")
+                
+        except ValueError:
+            print("Error: Invalid number format.")
+        except Exception as e:
+            print(f"Error: {str(e)}")
+    
+    def _handle_isopropanol_example(self):
+        """Handle the specific isopropanol example problem."""
+        print("\n===== ISOPROPANOL EXAMPLE PROBLEM =====")
+        print("Problem: How many hydrogen atoms are in 36.25g of isopropanol?")
+        
+        try:
+            result = solve_isopropanol_problem()
             
+            display_results_header()
+            if result['success']:
+                print(f"Problem: {result['problem']}")
+                print(f"\nSOLUTION STEPS:")
+                print(f"1. Isopropanol formula: {result['formula']} (C₃H₈O)")
+                print(f"2. Molar mass: {result['molar_mass']:.4f} g/mol")
+                print(f"3. Moles = {result['mass_grams']}g ÷ {result['molar_mass']:.4f} g/mol = {result['moles']:.6f} mol")
+                print(f"4. Hydrogen atoms per molecule: {result['hydrogen_atoms_per_molecule']}")
+                print(f"5. Total H atoms = {result['moles']:.6f} mol × {AVOGADROS_NUMBER:.3e} × {result['hydrogen_atoms_per_molecule']}")
+                print(f"\nFINAL ANSWER: {result['scientific_notation']} H atoms")
+                
+                # Show answer choices comparison
+                print(f"\nAnswer choices comparison:")
+                choices = [
+                    ("A", 2.90e12),
+                    ("B", 2.40e12), 
+                    ("C", 2.90e24),
+                    ("D", 5.80e24),
+                    ("E", 4.80e12)
+                ]
+                
+                for letter, value in choices:
+                    diff = abs(result['total_hydrogen_atoms'] - value)
+                    match = " ✓ CORRECT" if diff < value * 0.01 else ""  # Within 1%
+                    print(f"  {letter}: {value:.2e}{match}")
+            else:
+                print(f"Error: {result['error']}")
         except Exception as e:
             print(f"Error: {str(e)}")
     
@@ -227,7 +339,11 @@ class EnhancedChemistryUI:
         print("\n===== CHEMICAL NAME TO FORMULA CONVERTER =====")
         
         try:
-            name = input("Enter chemical name: ")
+            name = input("Enter chemical name: ").strip()
+            if not name:
+                print("No name entered.")
+                return
+                
             result = get_formula_from_name(name)
             
             display_results_header()
@@ -240,70 +356,6 @@ class EnhancedChemistryUI:
                 print(f"Error: {result['error']}")
         except Exception as e:
             print(f"Error: {str(e)}")
-    
-    # Helper methods that would use the enhanced chemistry functions
-    def _count_atoms_in_formula(self, formula, element=None):
-        """Mock implementation - would use enhanced function."""
-        # This would call the actual enhanced function
-        try:
-            if formula.upper() == "C3H8O":  # Isopropanol example
-                if element and element.upper() == "H":
-                    return {'success': True, 'element': 'H', 'count': 8}
-                elif not element:
-                    return {'success': True, 'total_atoms': 12, 'atom_breakdown': {'C': 3, 'H': 8, 'O': 1}}
-            return {'success': False, 'error': 'Formula parsing not implemented in mock'}
-        except:
-            return {'success': False, 'error': 'Error in atom counting'}
-    
-    def _calculate_atoms_from_mass(self, formula, mass, element=None):
-        """Mock implementation - would use enhanced function."""
-        try:
-            if formula.upper() == "C3H8O":  # Isopropanol
-                molar_mass = 60.096  # g/mol for C3H8O
-                moles = mass / molar_mass
-                if element and element.upper() == "H":
-                    atoms_per_molecule = 8
-                    total_atoms = moles * AVOGADROS_NUMBER * atoms_per_molecule
-                    return {
-                        'success': True,
-                        'formula': formula,
-                        'mass_grams': mass,
-                        'molar_mass': molar_mass,
-                        'moles': moles,
-                        'atoms_per_molecule': atoms_per_molecule,
-                        'total_atoms': total_atoms,
-                        'element': element
-                    }
-            return {'success': False, 'error': 'Formula not supported in mock'}
-        except:
-            return {'success': False, 'error': 'Error in calculation'}
-    
-    def _calculate_mass_from_atoms(self, formula, num_atoms, element=None):
-        """Mock implementation - would use enhanced function."""
-        return {'success': False, 'error': 'Not implemented in mock'}
-    
-    def _solve_isopropanol_problem(self):
-        """Solve the specific isopropanol problem."""
-        mass_grams = 36.25
-        formula = "C3H8O"
-        molar_mass = 60.096  # g/mol
-        moles = mass_grams / molar_mass
-        h_atoms_per_molecule = 8
-        total_h_atoms = moles * AVOGADROS_NUMBER * h_atoms_per_molecule
-        
-        return {
-            'success': True,
-            'problem': f"How many hydrogen atoms in {mass_grams}g of isopropanol?",
-            'formula': formula,
-            'mass_grams': mass_grams,
-            'molar_mass': molar_mass,
-            'moles': moles,
-            'hydrogen_atoms_per_molecule': h_atoms_per_molecule,
-            'total_hydrogen_atoms': total_h_atoms,
-            'scientific_notation': f"{total_h_atoms:.2e}"
-        }
 
-# Main execution
-if __name__ == "__main__":
-    app = EnhancedChemistryUI()
-    app.run()
+# For backwards compatibility with the old class name
+EnhancedChemistryUI = MolarMassUI

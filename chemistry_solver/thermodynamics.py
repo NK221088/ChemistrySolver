@@ -779,9 +779,133 @@ def solve_equilibrium_constant_problem(
     }
 
 
+def solve_equilibrium_from_formation_data(
+    reaction_coefficients,      # Dict: {'reactants': {'substance': coeff}, 'products': {'substance': coeff}}
+    formation_enthalpies,       # Dict: {'substance': ΔHf° in kJ/mol}
+    standard_entropies,         # Dict: {'substance': S° in J/(mol·K)}
+    temperature_c=25,           # Temperature in Celsius
+    reaction_string=None        # Optional reaction string for display
+) -> Dict[str, Any]:
+    """
+    Calculate equilibrium constant from standard formation data for any reaction.
+    
+    Parameters:
+        reaction_coefficients (dict): Reaction stoichiometry
+            Example: {'reactants': {'N2': 1, 'H2': 3}, 'products': {'NH3': 2}}
+        formation_enthalpies (dict): Standard enthalpies of formation in kJ/mol
+            Example: {'N2': 0, 'H2': 0, 'NH3': -45.9}
+        standard_entropies (dict): Standard entropies in J/(mol·K)
+            Example: {'N2': 191.6, 'H2': 130.7, 'NH3': 192.8}
+        temperature_c (float): Temperature in Celsius (default 25°C)
+        reaction_string (str, optional): Balanced chemical equation for display
+        
+    Returns:
+        Dict[str, Any]: Dictionary containing results and solution steps
+    """
+    
+    # Calculate ΔH° for the reaction
+    delta_h_reaction = 0
+    for substance, coeff in reaction_coefficients['products'].items():
+        if substance in formation_enthalpies:
+            delta_h_reaction += coeff * formation_enthalpies[substance]
+    
+    for substance, coeff in reaction_coefficients['reactants'].items():
+        if substance in formation_enthalpies:
+            delta_h_reaction -= coeff * formation_enthalpies[substance]
+    
+    # Calculate ΔS° for the reaction
+    delta_s_reaction = 0
+    for substance, coeff in reaction_coefficients['products'].items():
+        if substance in standard_entropies:
+            delta_s_reaction += coeff * standard_entropies[substance]
+    
+    for substance, coeff in reaction_coefficients['reactants'].items():
+        if substance in standard_entropies:
+            delta_s_reaction -= coeff * standard_entropies[substance]
+    
+    # Build detailed calculation steps
+    detailed_steps = [
+        "Given thermodynamic data:",
+        "Formation enthalpies (ΔHf°):"
+    ]
+    
+    for substance, value in formation_enthalpies.items():
+        detailed_steps.append(f"  {substance}: {value} kJ/mol")
+    
+    detailed_steps.extend([
+        "",
+        "Standard entropies (S°):"
+    ])
+    
+    for substance, value in standard_entropies.items():
+        detailed_steps.append(f"  {substance}: {value} J/(mol·K)")
+    
+    detailed_steps.extend([
+        "",
+        "Step 1: Calculate ΔH° for the reaction:",
+        "ΔH°rxn = Σ(coefficients × ΔHf°)products - Σ(coefficients × ΔHf°)reactants"
+    ])
+    
+    # Add detailed ΔH° calculation
+    products_h_terms = []
+    reactants_h_terms = []
+    
+    for substance, coeff in reaction_coefficients['products'].items():
+        if substance in formation_enthalpies:
+            products_h_terms.append(f"{coeff} × ({formation_enthalpies[substance]})")
+    
+    for substance, coeff in reaction_coefficients['reactants'].items():
+        if substance in formation_enthalpies:
+            reactants_h_terms.append(f"{coeff} × ({formation_enthalpies[substance]})")
+    
+    detailed_steps.append(f"ΔH°rxn = [{' + '.join(products_h_terms)}] - [{' + '.join(reactants_h_terms)}]")
+    detailed_steps.append(f"ΔH°rxn = {delta_h_reaction} kJ/mol")
+    detailed_steps.append("")
+    
+    detailed_steps.extend([
+        "Step 2: Calculate ΔS° for the reaction:",
+        "ΔS°rxn = Σ(coefficients × S°)products - Σ(coefficients × S°)reactants"
+    ])
+    
+    # Add detailed ΔS° calculation
+    products_s_terms = []
+    reactants_s_terms = []
+    
+    for substance, coeff in reaction_coefficients['products'].items():
+        if substance in standard_entropies:
+            products_s_terms.append(f"{coeff} × {standard_entropies[substance]}")
+    
+    for substance, coeff in reaction_coefficients['reactants'].items():
+        if substance in standard_entropies:
+            reactants_s_terms.append(f"{coeff} × {standard_entropies[substance]}")
+    
+    detailed_steps.append(f"ΔS°rxn = [{' + '.join(products_s_terms)}] - [{' + '.join(reactants_s_terms)}]")
+    detailed_steps.append(f"ΔS°rxn = {delta_s_reaction} J/(mol·K)")
+    detailed_steps.append("")
+    
+    # Use the general equilibrium constant function
+    result = solve_equilibrium_constant_problem(
+        delta_h_standard=delta_h_reaction,
+        delta_s_standard=delta_s_reaction,
+        temperature_c=temperature_c,
+        reaction_string=reaction_string
+    )
+    
+    # Add the detailed formation data steps to the beginning
+    result["steps"] = detailed_steps + result["steps"]
+    
+    # Add the input data to the result
+    result["formation_enthalpies"] = formation_enthalpies
+    result["standard_entropies"] = standard_entropies
+    result["reaction_coefficients"] = reaction_coefficients
+    
+    return result
+
+
 def solve_haber_bosch_problem(temperature_c=25):
     """
-    Solve the specific Haber-Bosch process equilibrium constant problem.
+    Solve the Haber-Bosch process equilibrium constant problem as an example.
+    This is now just a wrapper that calls the general function with Haber-Bosch data.
     
     Parameters:
         temperature_c (float): Temperature in Celsius (default 25°C)
@@ -789,76 +913,32 @@ def solve_haber_bosch_problem(temperature_c=25):
     Returns:
         Dict[str, Any]: Dictionary containing results and solution steps
     """
-    # Thermodynamic data for the Haber-Bosch process at standard conditions
-    # N2(g) + 3H2(g) ⇌ 2NH3(g)
+    # Define the reaction: N2(g) + 3H2(g) ⇌ 2NH3(g)
+    reaction_coefficients = {
+        'reactants': {'N2': 1, 'H2': 3},
+        'products': {'NH3': 2}
+    }
     
-    # Standard enthalpies of formation (kJ/mol)
-    delta_hf_nh3 = -45.9  # kJ/mol
-    delta_hf_n2 = 0       # kJ/mol (element)
-    delta_hf_h2 = 0       # kJ/mol (element)
+    # Thermodynamic data
+    formation_enthalpies = {
+        'NH3': -45.9,  # kJ/mol
+        'N2': 0,       # kJ/mol (element)
+        'H2': 0        # kJ/mol (element)
+    }
     
-    # Standard entropies (J/(mol·K))
-    s_nh3 = 192.8     # J/(mol·K)
-    s_n2 = 191.6      # J/(mol·K)
-    s_h2 = 130.7      # J/(mol·K)
+    standard_entropies = {
+        'NH3': 192.8,  # J/(mol·K)
+        'N2': 191.6,   # J/(mol·K)
+        'H2': 130.7    # J/(mol·K)
+    }
     
-    # Calculate ΔH° for the reaction
-    delta_h_reaction = (2 * delta_hf_nh3) - (1 * delta_hf_n2 + 3 * delta_hf_h2)
-    delta_h_reaction = (2 * -45.9) - (0 + 0) = -91.8  # kJ/mol
-    
-    # Calculate ΔS° for the reaction
-    delta_s_reaction = (2 * s_nh3) - (1 * s_n2 + 3 * s_h2)
-    delta_s_reaction = (2 * 192.8) - (191.6 + 3 * 130.7)
-    delta_s_reaction = 385.6 - (191.6 + 392.1) = 385.6 - 583.7 = -198.1  # J/(mol·K)
-    
-    # Solve using the general function
-    result = solve_equilibrium_constant_problem(
-        delta_h_standard=delta_h_reaction,
-        delta_s_standard=delta_s_reaction,
+    return solve_equilibrium_from_formation_data(
+        reaction_coefficients=reaction_coefficients,
+        formation_enthalpies=formation_enthalpies,
+        standard_entropies=standard_entropies,
         temperature_c=temperature_c,
         reaction_string="N₂(g) + 3H₂(g) ⇌ 2NH₃(g)"
     )
-    
-    # Add problem-specific information
-    result["delta_h_formation"] = {
-        "NH3": delta_hf_nh3,
-        "N2": delta_hf_n2,
-        "H2": delta_hf_h2
-    }
-    result["standard_entropies"] = {
-        "NH3": s_nh3,
-        "N2": s_n2,
-        "H2": s_h2
-    }
-    
-    # Insert calculation details at the beginning
-    detailed_steps = [
-        "Given thermodynamic data:",
-        f"ΔHf°(NH₃) = {delta_hf_nh3} kJ/mol",
-        f"ΔHf°(N₂) = {delta_hf_n2} kJ/mol",
-        f"ΔHf°(H₂) = {delta_hf_h2} kJ/mol",
-        f"S°(NH₃) = {s_nh3} J/(mol·K)",
-        f"S°(N₂) = {s_n2} J/(mol·K)",
-        f"S°(H₂) = {s_h2} J/(mol·K)",
-        "",
-        "Step 1: Calculate ΔH° for the reaction:",
-        "ΔH°rxn = Σ(coefficients × ΔHf°)products - Σ(coefficients × ΔHf°)reactants",
-        f"ΔH°rxn = [2 × ({delta_hf_nh3})] - [1 × ({delta_hf_n2}) + 3 × ({delta_hf_h2})]",
-        f"ΔH°rxn = [{2 * delta_hf_nh3}] - [{delta_hf_n2 + 3 * delta_hf_h2}]",
-        f"ΔH°rxn = {delta_h_reaction} kJ/mol",
-        "",
-        "Step 2: Calculate ΔS° for the reaction:",
-        "ΔS°rxn = Σ(coefficients × S°)products - Σ(coefficients × S°)reactants",
-        f"ΔS°rxn = [2 × {s_nh3}] - [1 × {s_n2} + 3 × {s_h2}]",
-        f"ΔS°rxn = [{2 * s_nh3}] - [{s_n2 + 3 * s_h2}]",
-        f"ΔS°rxn = {delta_s_reaction} J/(mol·K)",
-        ""
-    ]
-    
-    # Combine with existing steps
-    result["steps"] = detailed_steps + result["steps"]
-    
-    return result
 
 #######################################
 # Clausius-Clapeyron Equation Functions

@@ -3,11 +3,11 @@ Terminal User Interface for Thermodynamics Calculations
 """
 from ui.terminal_ui import display_title, display_results_header, wait_for_user
 from chemistry_solver.thermodynamics import (calculate_heat, calculate_temperature_change, calculate_final_temperature,
-                          calculate_molar_heat, solve_thermal_equilibrium, solve_thermal_equilibrium_with_molar_heat,
-                          handle_heat_transfer_problem, handle_heat_transfer_with_molar_heat, solve_mixture_problem,
-                          calculate_boiling_point_with_pressure, calculate_pressure_with_temperature, 
-                          calculate_heat_of_vaporization, parse_reaction_string, solve_enthalpy_problem, solve_equilibrium_constant_problem, solve_haber_bosch_problem)
-
+                      calculate_molar_heat, solve_thermal_equilibrium, solve_thermal_equilibrium_with_molar_heat,
+                      handle_heat_transfer_problem, handle_heat_transfer_with_molar_heat, solve_mixture_problem,
+                      calculate_boiling_point_with_pressure, calculate_pressure_with_temperature, 
+                      calculate_heat_of_vaporization, parse_reaction_string, solve_enthalpy_problem, 
+                      solve_equilibrium_constant_problem, solve_equilibrium_from_formation_data)
 # Import the name_to_formula module
 try:
     from chemistry_solver.name_to_formula import get_formula_from_name
@@ -498,8 +498,8 @@ class ThermodynamicsUI:
         """
         print("\n=== Equilibrium Constant Calculations ===")
         print("Select the type of calculation:")
-        print("[1] Calculate equilibrium constant from thermodynamic data")
-        print("[2] Haber-Bosch process example")
+        print("[1] Calculate equilibrium constant from ΔH° and ΔS° (or ΔG°)")
+        print("[2] Calculate equilibrium constant from formation data")
         
         choice = input("\nEnter choice (1-2): ").strip()
         
@@ -563,12 +563,66 @@ class ThermodynamicsUI:
                 print("Since K ≈ 1, reactants and products are present in similar amounts at equilibrium.")
                 
         elif choice == "2":
-            print("\n--- Haber-Bosch Process Example ---")
-            print("Reaction: N₂(g) + 3H₂(g) ⇌ 2NH₃(g)")
+            print("\n--- Calculate Equilibrium Constant from Formation Data ---")
+            print("This will calculate the equilibrium constant using standard formation enthalpies and entropies.")
             
+            # Get reaction string
+            reaction = input("\nEnter balanced chemical equation: ").strip()
+            
+            # Get temperature
             temp_c = float(input("Enter temperature (°C, default=25): ") or "25")
             
-            result = solve_haber_bosch_problem(temperature_c=temp_c)
+            # Parse reactants and products from user input
+            print("\n--- Enter Reactants ---")
+            reactants = {}
+            num_reactants = int(input("How many different reactants? "))
+            
+            for i in range(num_reactants):
+                substance = input(f"Reactant {i+1} name/formula: ").strip()
+                coeff = float(input(f"Coefficient for {substance}: "))
+                reactants[substance] = coeff
+            
+            print("\n--- Enter Products ---")
+            products = {}
+            num_products = int(input("How many different products? "))
+            
+            for i in range(num_products):
+                substance = input(f"Product {i+1} name/formula: ").strip()
+                coeff = float(input(f"Coefficient for {substance}: "))
+                products[substance] = coeff
+            
+            reaction_coefficients = {
+                'reactants': reactants,
+                'products': products
+            }
+            
+            # Get all unique substances
+            all_substances = set(reactants.keys()) | set(products.keys())
+            
+            print(f"\n--- Enter Formation Enthalpies (ΔHf°) ---")
+            print("Note: Elements in their standard state have ΔHf° = 0")
+            formation_enthalpies = {}
+            
+            for substance in all_substances:
+                default_hint = " (0 for elements)" if substance in ['H2', 'N2', 'O2', 'F2', 'Cl2', 'Br2', 'I2'] else ""
+                value = input(f"ΔHf° for {substance} (kJ/mol){default_hint}: ")
+                formation_enthalpies[substance] = float(value) if value else 0.0
+            
+            print(f"\n--- Enter Standard Entropies (S°) ---")
+            standard_entropies = {}
+            
+            for substance in all_substances:
+                value = float(input(f"S° for {substance} (J/(mol·K)): "))
+                standard_entropies[substance] = value
+            
+            # Solve the problem
+            result = solve_equilibrium_from_formation_data(
+                reaction_coefficients=reaction_coefficients,
+                formation_enthalpies=formation_enthalpies,
+                standard_entropies=standard_entropies,
+                temperature_c=temp_c,
+                reaction_string=reaction
+            )
             
             display_results_header()
             for step in result["steps"]:
@@ -577,19 +631,15 @@ class ThermodynamicsUI:
             print(f"\n=== FINAL RESULTS ===")
             print(f"Reaction: {result['reaction']}")
             print(f"Temperature: {result['temperature_c']:.2f} °C ({result['temperature_k']:.2f} K)")
-            print(f"ΔH°: {result['delta_h_standard']:.1f} kJ/mol")
-            print(f"ΔS°: {result['delta_s_standard']:.1f} J/(mol·K)")
-            print(f"ΔG°: {result['delta_g_standard']:.3f} kJ/mol")
+            print(f"ΔH°rxn: {result['delta_h_standard']:.1f} kJ/mol")
+            print(f"ΔS°rxn: {result['delta_s_standard']:.1f} J/(mol·K)")
+            print(f"ΔG°rxn: {result['delta_g_standard']:.3f} kJ/mol")
             print(f"Equilibrium constant (K): {result['equilibrium_constant']:.2e}")
             
             # Interpret the result
             if result['equilibrium_constant'] > 1:
-                print("Since K > 1, the formation of ammonia is thermodynamically favored.")
+                print("Since K > 1, the reaction favors products at equilibrium.")
+            elif result['equilibrium_constant'] < 1:
+                print("Since K < 1, the reaction favors reactants at equilibrium.")
             else:
-                print("Since K < 1, the reaction favors the reactants (N₂ and H₂).")
-            
-            print("\nNote: While this reaction may be thermodynamically favorable,")
-            print("kinetic factors (activation energy) make it slow without a catalyst.")
-                
-        else:
-            print("Invalid choice.")
+                print("Since K ≈ 1, reactants and products are present in similar amounts at equilibrium.")

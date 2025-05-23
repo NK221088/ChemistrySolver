@@ -901,45 +901,6 @@ def solve_equilibrium_from_formation_data(
     
     return result
 
-
-def solve_haber_bosch_problem(temperature_c=25):
-    """
-    Solve the Haber-Bosch process equilibrium constant problem as an example.
-    This is now just a wrapper that calls the general function with Haber-Bosch data.
-    
-    Parameters:
-        temperature_c (float): Temperature in Celsius (default 25°C)
-        
-    Returns:
-        Dict[str, Any]: Dictionary containing results and solution steps
-    """
-    # Define the reaction: N2(g) + 3H2(g) ⇌ 2NH3(g)
-    reaction_coefficients = {
-        'reactants': {'N2': 1, 'H2': 3},
-        'products': {'NH3': 2}
-    }
-    
-    # Thermodynamic data
-    formation_enthalpies = {
-        'NH3': -45.9,  # kJ/mol
-        'N2': 0,       # kJ/mol (element)
-        'H2': 0        # kJ/mol (element)
-    }
-    
-    standard_entropies = {
-        'NH3': 192.8,  # J/(mol·K)
-        'N2': 191.6,   # J/(mol·K)
-        'H2': 130.7    # J/(mol·K)
-    }
-    
-    return solve_equilibrium_from_formation_data(
-        reaction_coefficients=reaction_coefficients,
-        formation_enthalpies=formation_enthalpies,
-        standard_entropies=standard_entropies,
-        temperature_c=temperature_c,
-        reaction_string="N₂(g) + 3H₂(g) ⇌ 2NH₃(g)"
-    )
-
 #######################################
 # Clausius-Clapeyron Equation Functions
 #######################################

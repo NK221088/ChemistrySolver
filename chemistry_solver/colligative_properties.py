@@ -1,932 +1,487 @@
 """
-Enhanced Colligative Properties Module
+Refactored Colligative Properties Calculator
 
-This module includes functions to calculate various colligative properties:
-1. Freezing point depression (calculate MW from data OR compare solutions)
-2. Boiling point elevation (calculate MW from data OR compare solutions)
-3. Osmotic pressure
-4. Vapor pressure lowering
-5. Solution comparison utilities
+This module provides functions to solve colligative property problems:
+1. Calculate molecular weight from colligative property data
+2. Compare solutions based on colligative properties
+3. Calculate colligative property values from concentration data
 
-It integrates with the existing molar mass calculation functionality.
+Supports: freezing point depression, boiling point elevation, osmotic pressure, vapor pressure lowering
 """
 
 from chemistry_solver.molar_mass import calculate_molar_mass
 from chemistry_solver.name_to_formula import get_formula_from_name
+from .colligative_constants import SOLVENT_CONSTANTS, R_OSMOTIC, GRAMS_TO_KG, CELSIUS_TO_KELVIN
 
-# Common freezing point depression constants (Kf) in °C/m
-FREEZING_POINT_CONSTANTS = {
-    "water": 1.86,
-    "benzene": 5.12,
-    "cyclohexane": 20.0,
-    "camphor": 40.0,
-    "acetic_acid": 3.90,
-    "naphthalene": 6.94
-}
 
-# Common boiling point elevation constants (Kb) in °C/m
-BOILING_POINT_CONSTANTS = {
-    "water": 0.512,
-    "benzene": 2.53,
-    "chloroform": 3.63,
-    "ethanol": 1.22,
-    "acetic_acid": 3.07
-}
+class ColligativePropertyCalculator:
+    """Unified calculator for all colligative property problems."""
+    
+    def __init__(self, solvent="water"):
+        """
+        Initialize calculator with solvent properties.
+        
+        Parameters:
+        -----------
+        solvent : str
+            Solvent name (default: "water")
+        """
+        self.solvent = solvent.lower()
+        self.constants = SOLVENT_CONSTANTS.get(self.solvent, SOLVENT_CONSTANTS["water"])
+        
+    def _get_solvent_molar_mass(self, solvent_formula):
+        """Get molar mass of solvent from formula or name."""
+        # Convert name to formula if necessary
+        if not any(char.isdigit() for char in solvent_formula):
+            name_result = get_formula_from_name(solvent_formula)
+            if name_result['success']:
+                solvent_formula = name_result['formula']
+        
+        result = calculate_molar_mass(solvent_formula)
+        if not result['success']:
+            raise ValueError(f"Cannot calculate molar mass for {solvent_formula}: {result['error']}")
+        
+        return result['molar_mass']
+    
+    def calculate_property_from_molality(self, molality, property_type, ionization_factor=1):
+        """
+        Calculate colligative property value from molality.
+        
+        Parameters:
+        -----------
+        molality : float
+            Molality of solution (mol/kg)
+        property_type : str
+            "freezing_point_depression", "boiling_point_elevation"
+        ionization_factor : float
+            van 't Hoff factor (default: 1)
+        
+        Returns:
+        --------
+        float
+            Property value in °C
+        """
+        if property_type == "freezing_point_depression":
+            return self.constants["Kf"] * molality * ionization_factor
+        elif property_type == "boiling_point_elevation":
+            return self.constants["Kb"] * molality * ionization_factor
+        else:
+            raise ValueError(f"Unsupported property type: {property_type}")
+    
+    def calculate_molecular_weight(self, method, delta_T, solute_mass, solvent_mass, 
+                                 ionization_factor=1, answer_choices=None, **kwargs):
+        """
+        Calculate molecular weight from colligative property data.
+        
+        Parameters:
+        -----------
+        method : str
+            "freezing_point", "boiling_point", "osmotic_pressure", "vapor_pressure"
+        delta_T : float
+            Temperature change (°C) or pressure for osmotic/vapor pressure methods
+        solute_mass : float
+            Mass of solute (g)
+        solvent_mass : float
+            Mass of solvent (g) - not used for osmotic pressure
+        ionization_factor : float
+            van 't Hoff factor (default: 1)
+        answer_choices : list, optional
+            Multiple choice options
+        **kwargs : dict
+            Method-specific parameters
+        
+        Returns:
+        --------
+        dict
+            Results with molecular weight and calculation steps
+        """
+        if method == "freezing_point":
+            return self._calculate_mw_freezing_point(
+                delta_T, solute_mass, solvent_mass, ionization_factor, answer_choices
+            )
+        elif method == "boiling_point":
+            return self._calculate_mw_boiling_point(
+                delta_T, solute_mass, solvent_mass, ionization_factor, answer_choices
+            )
+        elif method == "osmotic_pressure":
+            return self._calculate_mw_osmotic_pressure(
+                delta_T, solute_mass, kwargs.get('temperature_c'), 
+                kwargs.get('solution_volume_L'), ionization_factor, answer_choices
+            )
+        elif method == "vapor_pressure":
+            return self._calculate_mw_vapor_pressure(
+                kwargs.get('P_pure'), kwargs.get('P_solution'), 
+                solute_mass, kwargs.get('solvent_formula'), solvent_mass, answer_choices
+            )
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+    
+    def _calculate_mw_freezing_point(self, delta_T, solute_mass, solvent_mass, 
+                                   ionization_factor, answer_choices):
+        """Calculate MW from freezing point depression."""
+        solvent_mass_kg = solvent_mass / GRAMS_TO_KG
+        Kf = self.constants["Kf"]
+        
+        # Calculate molality: m = ΔT / (Kf × i)
+        molality = delta_T / (Kf * ionization_factor)
+        
+        # Calculate moles of solute
+        moles_solute = molality * solvent_mass_kg
+        
+        # Calculate molecular weight
+        molecular_weight = solute_mass / moles_solute
+        
+        steps = [
+            f"Freezing Point Depression Calculation:",
+            f"Given: ΔTf = {delta_T}°C, Kf = {Kf}°C/m, i = {ionization_factor}",
+            f"Mass of solute = {solute_mass} g, Mass of solvent = {solvent_mass} g",
+            f"",
+            f"Step 1: Calculate molality",
+            f"m = ΔTf / (Kf × i) = {delta_T} / ({Kf} × {ionization_factor}) = {molality:.4f} mol/kg",
+            f"",
+            f"Step 2: Calculate moles of solute",
+            f"moles = m × kg solvent = {molality:.4f} × {solvent_mass_kg} = {moles_solute:.6f} mol",
+            f"",
+            f"Step 3: Calculate molecular weight",
+            f"MW = mass / moles = {solute_mass} / {moles_solute:.6f} = {molecular_weight:.2f} g/mol"
+        ]
+        
+        return self._format_mw_result(molecular_weight, steps, answer_choices, 
+                                    molality=molality, moles_solute=moles_solute)
+    
+    def _calculate_mw_boiling_point(self, delta_T, solute_mass, solvent_mass, 
+                                  ionization_factor, answer_choices):
+        """Calculate MW from boiling point elevation."""
+        solvent_mass_kg = solvent_mass / GRAMS_TO_KG
+        Kb = self.constants["Kb"]
+        
+        # Calculate molality: m = ΔT / (Kb × i)
+        molality = delta_T / (Kb * ionization_factor)
+        
+        # Calculate moles of solute
+        moles_solute = molality * solvent_mass_kg
+        
+        # Calculate molecular weight
+        molecular_weight = solute_mass / moles_solute
+        
+        steps = [
+            f"Boiling Point Elevation Calculation:",
+            f"Given: ΔTb = {delta_T}°C, Kb = {Kb}°C/m, i = {ionization_factor}",
+            f"Mass of solute = {solute_mass} g, Mass of solvent = {solvent_mass} g",
+            f"",
+            f"Step 1: Calculate molality",
+            f"m = ΔTb / (Kb × i) = {delta_T} / ({Kb} × {ionization_factor}) = {molality:.4f} mol/kg",
+            f"",
+            f"Step 2: Calculate moles of solute",
+            f"moles = m × kg solvent = {molality:.4f} × {solvent_mass_kg} = {moles_solute:.6f} mol",
+            f"",
+            f"Step 3: Calculate molecular weight",
+            f"MW = mass / moles = {solute_mass} / {moles_solute:.6f} = {molecular_weight:.2f} g/mol"
+        ]
+        
+        return self._format_mw_result(molecular_weight, steps, answer_choices,
+                                    molality=molality, moles_solute=moles_solute)
+    
+    def _calculate_mw_osmotic_pressure(self, osmotic_pressure_atm, solute_mass, 
+                                     temperature_c, solution_volume_L, ionization_factor, answer_choices):
+        """Calculate MW from osmotic pressure."""
+        temperature_k = temperature_c + CELSIUS_TO_KELVIN
+        
+        # Calculate moles: π = iMRT → moles = πV/(iRT)
+        moles_solute = osmotic_pressure_atm * solution_volume_L / (ionization_factor * R_OSMOTIC * temperature_k)
+        
+        # Calculate molecular weight
+        molecular_weight = solute_mass / moles_solute
+        
+        steps = [
+            f"Osmotic Pressure Calculation:",
+            f"Given: π = {osmotic_pressure_atm} atm, T = {temperature_c}°C = {temperature_k} K",
+            f"V = {solution_volume_L} L, mass = {solute_mass} g, i = {ionization_factor}",
+            f"",
+            f"Step 1: Calculate moles using π = iMRT",
+            f"moles = πV/(iRT) = ({osmotic_pressure_atm} × {solution_volume_L}) / ({ionization_factor} × {R_OSMOTIC} × {temperature_k})",
+            f"moles = {moles_solute:.6f} mol",
+            f"",
+            f"Step 2: Calculate molecular weight",
+            f"MW = mass / moles = {solute_mass} / {moles_solute:.6f} = {molecular_weight:.2f} g/mol"
+        ]
+        
+        return self._format_mw_result(molecular_weight, steps, answer_choices, moles_solute=moles_solute)
+    
+    def _calculate_mw_vapor_pressure(self, P_pure, P_solution, solute_mass, 
+                                   solvent_formula, solvent_mass, answer_choices):
+        """Calculate MW from vapor pressure lowering."""
+        # Get solvent molar mass
+        solvent_molar_mass = self._get_solvent_molar_mass(solvent_formula)
+        
+        # Calculate vapor pressure lowering and mole fraction
+        delta_P = P_pure - P_solution
+        mole_fraction_solute = delta_P / P_pure
+        
+        # Calculate moles of solvent and solute
+        moles_solvent = solvent_mass / solvent_molar_mass
+        moles_solute = (mole_fraction_solute * moles_solvent) / (1 - mole_fraction_solute)
+        
+        # Calculate molecular weight
+        molecular_weight = solute_mass / moles_solute
+        
+        steps = [
+            f"Vapor Pressure Lowering Calculation:",
+            f"Given: P_pure = {P_pure}, P_solution = {P_solution}",
+            f"Solvent: {solvent_formula} (MW = {solvent_molar_mass:.2f} g/mol)",
+            f"Mass of solute = {solute_mass} g, Mass of solvent = {solvent_mass} g",
+            f"",
+            f"Step 1: Calculate vapor pressure lowering",
+            f"ΔP = {P_pure} - {P_solution} = {delta_P}",
+            f"",
+            f"Step 2: Calculate mole fraction of solute",
+            f"X_solute = ΔP / P_pure = {delta_P} / {P_pure} = {mole_fraction_solute:.6f}",
+            f"",
+            f"Step 3: Calculate moles of solvent",
+            f"n_solvent = {solvent_mass} / {solvent_molar_mass:.2f} = {moles_solvent:.6f} mol",
+            f"",
+            f"Step 4: Calculate moles of solute",
+            f"n_solute = (X_solute × n_solvent) / (1 - X_solute)",
+            f"n_solute = ({mole_fraction_solute:.6f} × {moles_solvent:.6f}) / (1 - {mole_fraction_solute:.6f}) = {moles_solute:.6f} mol",
+            f"",
+            f"Step 5: Calculate molecular weight",
+            f"MW = mass / moles = {solute_mass} / {moles_solute:.6f} = {molecular_weight:.2f} g/mol"
+        ]
+        
+        return self._format_mw_result(molecular_weight, steps, answer_choices,
+                                    moles_solute=moles_solute, moles_solvent=moles_solvent)
+    
+    def _format_mw_result(self, molecular_weight, steps, answer_choices, **extra_data):
+        """Format molecular weight calculation result."""
+        result = {
+            'success': True,
+            'molecular_weight': molecular_weight,
+            'steps': steps,
+            **extra_data
+        }
+        
+        if answer_choices:
+            closest_answer = min(answer_choices, key=lambda x: abs(x - molecular_weight))
+            difference = abs(closest_answer - molecular_weight)
+            
+            steps.extend([
+                f"",
+                f"Multiple Choice Analysis:",
+                f"Answer choices: {answer_choices}",
+                f"Closest match: {closest_answer} g/mol (difference: {difference:.2f})"
+            ])
+            
+            result.update({
+                'closest_answer': closest_answer,
+                'answer_difference': difference
+            })
+        
+        return result
+    
+    def compare_solutions(self, solutions, property_type="freezing_point_depression"):
+        """
+        Compare colligative properties of multiple solutions.
+        
+        Parameters:
+        -----------
+        solutions : list of dict
+            Each dict contains: 'molality', 'name' (optional), 'ionization_factor' (optional)
+        property_type : str
+            "freezing_point_depression" or "boiling_point_elevation"
+        
+        Returns:
+        --------
+        dict
+            Comparison results with rankings
+        """
+        if property_type not in ["freezing_point_depression", "boiling_point_elevation"]:
+            return {'success': False, 'error': f"Unsupported property type: {property_type}"}
+        
+        results = []
+        
+        # Calculate property for each solution
+        for i, solution in enumerate(solutions):
+            molality = solution['molality']
+            ionization_factor = solution.get('ionization_factor', 1)
+            name = solution.get('name', f"Solution {i+1} ({molality} m)")
+            
+            property_value = self.calculate_property_from_molality(
+                molality, property_type, ionization_factor
+            )
+            
+            results.append({
+                'name': name,
+                'molality': molality,
+                'ionization_factor': ionization_factor,
+                'property_value': property_value
+            })
+        
+        # Sort by property value (descending for highest effect)
+        results.sort(key=lambda x: x['property_value'], reverse=True)
+        
+        # Add rankings
+        for i, result in enumerate(results):
+            result['rank'] = i + 1
+        
+        # Generate explanation
+        constant_name = "Kf" if property_type == "freezing_point_depression" else "Kb"
+        constant_value = self.constants["Kf"] if property_type == "freezing_point_depression" else self.constants["Kb"]
+        formula = "ΔTf = Kf × m × i" if property_type == "freezing_point_depression" else "ΔTb = Kb × m × i"
+        
+        steps = [
+            f"Comparing {property_type.replace('_', ' ')} for multiple solutions:",
+            f"Solvent: {self.solvent} ({constant_name} = {constant_value}°C/m)",
+            f"Formula: {formula}",
+            f"",
+            f"Calculations:"
+        ]
+        
+        for result in results:
+            steps.append(f"  {result['name']}: {constant_value} × {result['molality']} × {result['ionization_factor']} = {result['property_value']:.3f}°C")
+        
+        steps.extend([
+            f"",
+            f"Ranking (highest to lowest):"
+        ])
+        
+        for result in results:
+            steps.append(f"  {result['rank']}. {result['name']}: {result['property_value']:.3f}°C")
+        
+        steps.extend([
+            f"",
+            f"Answer: {results[0]['name']} has the highest {property_type.replace('_', ' ')}"
+        ])
+        
+        return {
+            'success': True,
+            'property_type': property_type,
+            'solvent': self.solvent,
+            'constant': constant_value,
+            'results': results,
+            'highest': results[0],
+            'steps': steps
+        }
 
-def calculate_freezing_point_depression_from_molality(molality, K_f=1.86, ionization_factor=1):
+
+# Convenience functions for backward compatibility and ease of use
+def calculate_molecular_weight(method, solvent="water", **kwargs):
     """
-    Calculate freezing point depression from molality.
+    Calculate molecular weight from colligative property data.
     
     Parameters:
     -----------
-    molality : float
-        Molality of the solution (mol/kg)
-    K_f : float, optional
-        Freezing point depression constant in °C/m (default for water: 1.86)
-    ionization_factor : float, optional
-        van 't Hoff factor (default is 1 for non-electrolytes)
+    method : str
+        "freezing_point", "boiling_point", "osmotic_pressure", "vapor_pressure"
+    solvent : str
+        Solvent name (default: "water")
+    **kwargs : dict
+        Method-specific parameters (see ColligativePropertyCalculator.calculate_molecular_weight)
     
     Returns:
     --------
-    float
-        Freezing point depression in °C
+    dict
+        Results with molecular weight and steps
     """
-    return K_f * molality * ionization_factor
+    calculator = ColligativePropertyCalculator(solvent)
+    return calculator.calculate_molecular_weight(method, **kwargs)
 
-def calculate_boiling_point_elevation_from_molality(molality, K_b=0.512, ionization_factor=1):
-    """
-    Calculate boiling point elevation from molality.
-    
-    Parameters:
-    -----------
-    molality : float
-        Molality of the solution (mol/kg)
-    K_b : float, optional
-        Boiling point elevation constant in °C/m (default for water: 0.512)
-    ionization_factor : float, optional
-        van 't Hoff factor (default is 1 for non-electrolytes)
-    
-    Returns:
-    --------
-    float
-        Boiling point elevation in °C
-    """
-    return K_b * molality * ionization_factor
-
-def compare_solution_properties(solutions, property_type="freezing_point_depression", solvent="water"):
+def compare_colligative_properties(solutions, property_type="freezing_point_depression", solvent="water"):
     """
     Compare colligative properties of multiple solutions.
     
     Parameters:
     -----------
     solutions : list of dict
-        List of solution dictionaries with keys: 'molality', 'name' (optional), 'ionization_factor' (optional)
+        Each dict contains: 'molality', 'name' (optional), 'ionization_factor' (optional)
     property_type : str
-        Type of property to compare: "freezing_point_depression", "boiling_point_elevation"
+        "freezing_point_depression" or "boiling_point_elevation"
     solvent : str
-        Solvent name for looking up constants
+        Solvent name (default: "water")
     
     Returns:
     --------
     dict
-        Comparison results with rankings and values
+        Comparison results
     """
-    results = []
-    
-    # Get the appropriate constant
-    if property_type == "freezing_point_depression":
-        constant = FREEZING_POINT_CONSTANTS.get(solvent.lower(), 1.86)
-        calc_func = calculate_freezing_point_depression_from_molality
-    elif property_type == "boiling_point_elevation":
-        constant = BOILING_POINT_CONSTANTS.get(solvent.lower(), 0.512)
-        calc_func = calculate_boiling_point_elevation_from_molality
-    else:
-        return {'success': False, 'error': f"Unsupported property type: {property_type}"}
-    
-    # Calculate property for each solution
-    for i, solution in enumerate(solutions):
-        molality = solution['molality']
-        ionization_factor = solution.get('ionization_factor', 1)
-        name = solution.get('name', f"Solution {i+1}")
-        
-        property_value = calc_func(molality, constant, ionization_factor)
-        
-        results.append({
-            'name': name,
-            'molality': molality,
-            'ionization_factor': ionization_factor,
-            'property_value': property_value
-        })
-    
-    # Sort by property value (descending for highest effect)
-    results.sort(key=lambda x: x['property_value'], reverse=True)
-    
-    # Add rankings
-    for i, result in enumerate(results):
-        result['rank'] = i + 1
-    
-    return {
-        'success': True,
-        'property_type': property_type,
-        'solvent': solvent,
-        'constant': constant,
-        'results': results,
-        'highest': results[0] if results else None
-    }
+    calculator = ColligativePropertyCalculator(solvent)
+    return calculator.compare_solutions(solutions, property_type)
 
-def solve_multiple_choice_colligative_problem(molalities, property_type="freezing_point_depression", 
-                                            solvent="water", ionization_factors=None):
+def solve_multiple_choice_problem(problem_data):
     """
-    Solve multiple choice problems comparing colligative properties.
-    
-    Parameters:
-    -----------
-    molalities : list of float
-        List of molalities to compare
-    property_type : str
-        Type of property: "freezing_point_depression" or "boiling_point_elevation"
-    solvent : str
-        Solvent name
-    ionization_factors : list of float, optional
-        van 't Hoff factors for each solution (default all 1)
-    
-    Returns:
-    --------
-    dict
-        Results with detailed comparison and answer
-    """
-    if ionization_factors is None:
-        ionization_factors = [1] * len(molalities)
-    
-    if len(ionization_factors) != len(molalities):
-        return {'success': False, 'error': "Number of ionization factors must match number of molalities"}
-    
-    # Prepare solutions list
-    solutions = []
-    for i, (molality, i_factor) in enumerate(zip(molalities, ionization_factors)):
-        solutions.append({
-            'name': f"{molality} m solution",
-            'molality': molality,
-            'ionization_factor': i_factor
-        })
-    
-    # Compare solutions
-    comparison = compare_solution_properties(solutions, property_type, solvent)
-    
-    if not comparison['success']:
-        return comparison
-    
-    # Generate detailed explanation
-    steps = []
-    steps.append(f"Comparing {property_type.replace('_', ' ')} for different solutions:")
-    steps.append(f"Solvent: {solvent} (K = {comparison['constant']} °C/m)")
-    steps.append("")
-    
-    if property_type == "freezing_point_depression":
-        steps.append("Formula: ΔTf = Kf × m × i")
-        unit = "°C"
-        explanation = "Higher ΔTf means greater freezing point depression"
-    else:
-        steps.append("Formula: ΔTb = Kb × m × i")
-        unit = "°C"
-        explanation = "Higher ΔTb means greater boiling point elevation"
-    
-    steps.append("")
-    steps.append("Calculations:")
-    
-    for result in comparison['results']:
-        calc_detail = f"{comparison['constant']} × {result['molality']} × {result['ionization_factor']} = {result['property_value']:.3f} {unit}"
-        steps.append(f"  {result['name']}: {calc_detail}")
-    
-    steps.append("")
-    steps.append("Ranking (highest to lowest):")
-    for result in comparison['results']:
-        steps.append(f"  {result['rank']}. {result['name']}: {result['property_value']:.3f} {unit}")
-    
-    steps.append("")
-    steps.append(f"Answer: {comparison['highest']['name']} has the highest {property_type.replace('_', ' ')}")
-    steps.append(explanation)
-    
-    return {
-        'success': True,
-        'comparison': comparison,
-        'answer': comparison['highest'],
-        'steps': steps
-    }
-
-# Original functions (keeping for backward compatibility)
-def calculate_freezing_point_depression(T_pure, T_solution, K_f, solute_mass, solvent, solvent_mass, ionization_factor=1):
-    """
-    Calculate molecular weight based on freezing point depression.
-    
-    Parameters:
-    -----------
-    T_pure : float
-        Freezing point of pure solvent in °C
-    T_solution : float
-        Freezing point of solution in °C
-    K_f : float
-        Freezing point depression constant in °C/m
-    solute_mass : float
-        Mass of solute in grams
-    solvent : str
-        Chemical formula of the solvent
-    solvent_mass : float
-        Mass of solvent in grams
-    ionization_factor : float, optional
-        van 't Hoff factor (default is 1 for non-electrolytes)
-    
-    Returns:
-    --------
-    dict
-        Dictionary containing calculation results and steps
-    """
-    # Convert solvent mass to kg
-    solvent_mass_kg = solvent_mass / 1000
-    
-    # Retrieve solvent molar mass using existing functionality
-    # Convert name to formula if necessary
-    if not any(char.isdigit() for char in solvent):  # crude check for name vs formula
-        name_result = get_formula_from_name(solvent)
-        if name_result['success']:
-            solvent = name_result['formula']
-        else:
-            return {'success': False, 'error': f"Error resolving formula from name: {name_result['error']}"}
-
-    solvent_info = calculate_molar_mass(solvent)
-    if not solvent_info['success']:
-        return {'success': False, 'error': f"Error calculating solvent molar mass: {solvent_info['error']}"}
-    
-    solvent_molar_mass = solvent_info['molar_mass']
-    
-    # Calculate freezing point depression
-    delta_T = T_pure - T_solution
-    
-    # Calculate molality
-    molality = delta_T / (K_f * ionization_factor)
-    
-    # Calculate moles of solute
-    moles_solute = molality * solvent_mass_kg
-    
-    # Calculate molecular weight
-    molecular_weight = solute_mass / moles_solute
-    
-    # Generate calculation steps
-    steps = [
-        f"1. Calculate freezing point depression (ΔTf):",
-        f"   ΔTf = {T_pure}°C - {T_solution}°C = {delta_T}°C",
-        f"",
-        f"2. Determine solvent molar mass:",
-        f"   Molar mass of {solvent}: {solvent_molar_mass:.4f} g/mol",
-        f"",
-        f"3. Calculate molality (m) using the formula ΔTf = Kf × m × i:",
-        f"   m = ΔTf / (Kf × i) = {delta_T} / ({K_f} × {ionization_factor}) = {molality:.6f} mol/kg",
-        f"",
-        f"4. Calculate moles of solute:",
-        f"   moles = molality × kg of solvent = {molality:.6f} × {solvent_mass_kg} = {moles_solute:.6f} mol",
-        f"",
-        f"5. Calculate molecular weight:",
-        f"   molecular weight = mass / moles = {solute_mass} g / {moles_solute:.6f} mol = {molecular_weight:.2f} g/mol"
-    ]
-    
-    # Determine the closest rounded value from common answer choices
-    possible_answers = [36, 46, 56, 66, 76]  # Default common answer choices
-    closest_answer = min(possible_answers, key=lambda x: abs(x - molecular_weight))
-    
-    return {
-        'success': True,
-        'delta_T': delta_T,
-        'molality': molality,
-        'moles_solute': moles_solute,
-        'molecular_weight': molecular_weight,
-        'closest_answer': closest_answer,
-        'steps': steps
-    }
-
-def calculate_boiling_point_elevation(T_pure, T_solution, K_b, solute_mass, solvent, solvent_mass, ionization_factor=1):
-    """
-    Calculate molecular weight based on boiling point elevation.
-    
-    Parameters:
-    -----------
-    T_pure : float
-        Boiling point of pure solvent in °C
-    T_solution : float
-        Boiling point of solution in °C
-    K_b : float
-        Boiling point elevation constant in °C/m
-    solute_mass : float
-        Mass of solute in grams
-    solvent : str
-        Chemical formula of the solvent
-    solvent_mass : float
-        Mass of solvent in grams
-    ionization_factor : float, optional
-        van 't Hoff factor (default is 1 for non-electrolytes)
-    
-    Returns:
-    --------
-    dict
-        Dictionary containing calculation results and steps
-    """
-    # Convert solvent mass to kg
-    solvent_mass_kg = solvent_mass / 1000
-    
-    # Retrieve solvent molar mass using existing functionality
-    solvent_info = calculate_molar_mass(solvent)
-    if not solvent_info['success']:
-        return {'success': False, 'error': f"Error calculating solvent molar mass: {solvent_info['error']}"}
-    
-    solvent_molar_mass = solvent_info['molar_mass']
-    
-    # Calculate boiling point elevation
-    delta_T = T_solution - T_pure
-    
-    # Calculate molality
-    molality = delta_T / (K_b * ionization_factor)
-    
-    # Calculate moles of solute
-    moles_solute = molality * solvent_mass_kg
-    
-    # Calculate molecular weight
-    molecular_weight = solute_mass / moles_solute
-    
-    # Generate calculation steps
-    steps = [
-        f"1. Calculate boiling point elevation (ΔTb):",
-        f"   ΔTb = {T_solution}°C - {T_pure}°C = {delta_T}°C",
-        f"",
-        f"2. Determine solvent molar mass:",
-        f"   Molar mass of {solvent}: {solvent_molar_mass:.4f} g/mol",
-        f"",
-        f"3. Calculate molality (m) using the formula ΔTb = Kb × m × i:",
-        f"   m = ΔTb / (Kb × i) = {delta_T} / ({K_b} × {ionization_factor}) = {molality:.6f} mol/kg",
-        f"",
-        f"4. Calculate moles of solute:",
-        f"   moles = molality × kg of solvent = {molality:.6f} × {solvent_mass_kg} = {moles_solute:.6f} mol",
-        f"",
-        f"5. Calculate molecular weight:",
-        f"   molecular weight = mass / moles = {solute_mass} g / {moles_solute:.6f} mol = {molecular_weight:.2f} g/mol"
-    ]
-    
-    possible_answers = [36, 46, 56, 66, 76]  # Default common answer choices
-    closest_answer = min(possible_answers, key=lambda x: abs(x - molecular_weight))
-    
-    return {
-        'success': True,
-        'delta_T': delta_T,
-        'molality': molality,
-        'moles_solute': moles_solute,
-        'molecular_weight': molecular_weight,
-        'closest_answer': closest_answer,
-        'steps': steps
-    }
-
-def calculate_osmotic_pressure(osmotic_pressure_atm, temperature_c, solution_volume_L, solute_mass, ionization_factor=1):
-    """
-    Calculate molecular weight based on osmotic pressure.
-    
-    Parameters:
-    -----------
-    osmotic_pressure_atm : float
-        Osmotic pressure in atmospheres
-    temperature_c : float
-        Temperature in degrees Celsius
-    solution_volume_L : float
-        Volume of solution in liters
-    solute_mass : float
-        Mass of solute in grams
-    ionization_factor : float, optional
-        van 't Hoff factor (default is 1 for non-electrolytes)
-    
-    Returns:
-    --------
-    dict
-        Dictionary containing calculation results and steps
-    """
-    # Convert temperature to Kelvin
-    temperature_k = temperature_c + 273.15
-    
-    # Gas constant (R) in L·atm/(mol·K)
-    R = 0.08206
-    
-    # Calculate moles using the osmotic pressure equation: π = iMRT
-    moles_solute = osmotic_pressure_atm * solution_volume_L / (ionization_factor * R * temperature_k)
-    
-    # Calculate molecular weight
-    molecular_weight = solute_mass / moles_solute
-    
-    # Generate calculation steps
-    steps = [
-        f"1. Convert temperature to Kelvin:",
-        f"   T(K) = {temperature_c}°C + 273.15 = {temperature_k} K",
-        f"",
-        f"2. Calculate moles of solute using the formula π = iMRT (rearranged to M = π/(iRT)):",
-        f"   moles = π·V / (i·R·T) = {osmotic_pressure_atm} atm · {solution_volume_L} L / ({ionization_factor} · 0.08206 L·atm/(mol·K) · {temperature_k} K)",
-        f"   moles = {moles_solute:.6f} mol",
-        f"",
-        f"3. Calculate molecular weight:",
-        f"   molecular weight = mass / moles = {solute_mass} g / {moles_solute:.6f} mol = {molecular_weight:.2f} g/mol"
-    ]
-    
-    possible_answers = [36, 46, 56, 66, 76]  # Default common answer choices
-    closest_answer = min(possible_answers, key=lambda x: abs(x - molecular_weight))
-    
-    return {
-        'success': True,
-        'moles_solute': moles_solute,
-        'molecular_weight': molecular_weight,
-        'closest_answer': closest_answer,
-        'steps': steps
-    }
-
-def calculate_vapor_pressure_lowering(P_pure, P_solution, solute_mass, solvent, solvent_mass):
-    """
-    Calculate molecular weight based on vapor pressure lowering (Raoult's Law).
-    
-    Parameters:
-    -----------
-    P_pure : float
-        Vapor pressure of pure solvent
-    P_solution : float
-        Vapor pressure of solution
-    solute_mass : float
-        Mass of solute in grams
-    solvent : str
-        Chemical formula of the solvent
-    solvent_mass : float
-        Mass of solvent in grams
-    
-    Returns:
-    --------
-    dict
-        Dictionary containing calculation results and steps
-    """
-    # Retrieve solvent molar mass using existing functionality
-    solvent_info = calculate_molar_mass(solvent)
-    if not solvent_info['success']:
-        return {'success': False, 'error': f"Error calculating solvent molar mass: {solvent_info['error']}"}
-    
-    solvent_molar_mass = solvent_info['molar_mass']
-    
-    # Calculate vapor pressure lowering
-    delta_P = P_pure - P_solution
-    
-    # Calculate mole fraction of solute
-    # Using Raoult's law: P_solution = P_pure * (1 - X_solute)
-    # So: X_solute = (P_pure - P_solution) / P_pure
-    mole_fraction_solute = delta_P / P_pure
-    
-    # Calculate moles of solvent
-    moles_solvent = solvent_mass / solvent_molar_mass
-    
-    # Using the relationship: X_solute = n_solute / (n_solute + n_solvent)
-    # Rearrange to solve for n_solute
-    moles_solute = (mole_fraction_solute * moles_solvent) / (1 - mole_fraction_solute)
-    
-    # Calculate molecular weight
-    molecular_weight = solute_mass / moles_solute
-    
-    # Generate calculation steps
-    steps = [
-        f"1. Calculate vapor pressure lowering (ΔP):",
-        f"   ΔP = {P_pure} - {P_solution} = {delta_P}",
-        f"",
-        f"2. Determine solvent molar mass:",
-        f"   Molar mass of {solvent}: {solvent_molar_mass:.4f} g/mol",
-        f"",
-        f"3. Calculate mole fraction of solute using Raoult's law:",
-        f"   X_solute = ΔP / P_pure = {delta_P} / {P_pure} = {mole_fraction_solute:.6f}",
-        f"",
-        f"4. Calculate moles of solvent:",
-        f"   n_solvent = {solvent_mass} g / {solvent_molar_mass} g/mol = {moles_solvent:.6f} mol",
-        f"",
-        f"5. Calculate moles of solute:",
-        f"   X_solute = n_solute / (n_solute + n_solvent)",
-        f"   Rearranging: n_solute = (X_solute * n_solvent) / (1 - X_solute)",
-        f"   n_solute = ({mole_fraction_solute:.6f} * {moles_solvent:.6f}) / (1 - {mole_fraction_solute:.6f}) = {moles_solute:.6f} mol",
-        f"",
-        f"6. Calculate molecular weight:",
-        f"   molecular weight = mass / moles = {solute_mass} g / {moles_solute:.6f} mol = {molecular_weight:.2f} g/mol"
-    ]
-    
-    possible_answers = [36, 46, 56, 66, 76]  # Default common answer choices
-    closest_answer = min(possible_answers, key=lambda x: abs(x - molecular_weight))
-    
-    return {
-        'success': True,
-        'delta_P': delta_P,
-        'mole_fraction_solute': mole_fraction_solute,
-        'moles_solvent': moles_solvent,
-        'moles_solute': moles_solute,
-        'molecular_weight': molecular_weight,
-        'closest_answer': closest_answer,
-        'steps': steps
-    }
-
-# Wrapper functions for backward compatibility and convenience
-def solve_freezing_point_problem(T_pure, T_solution, solvent, K_f=None, solute_mass=1, solvent_mass=None, ionization_factor=1):
-    """
-    Solve a freezing point depression problem.
-    
-    Parameters:
-    -----------
-    T_pure : float
-        Freezing point of pure solvent in °C
-    T_solution : float
-        Freezing point of solution in °C
-    solvent : str
-        Chemical formula of the solvent
-    K_f : float, optional
-        Freezing point depression constant in °C/m (if None, will look up from constants)
-    solute_mass : float, optional
-        Mass of solute in grams (default 1g)
-    solvent_mass : float, optional
-        Mass of solvent in grams (required)
-    ionization_factor : float, optional
-        van 't Hoff factor (default is 1 for non-electrolytes)
-    
-    Returns:
-    --------
-    dict
-        Result dictionary
-    """
-    if solvent_mass is None:
-        return {'success': False, 'error': "Solvent mass is required"}
-    
-    # Use lookup table for K_f if not provided
-    if K_f is None:
-        solvent_lower = solvent.lower()
-        for key, value in FREEZING_POINT_CONSTANTS.items():
-            if key in solvent_lower or solvent_lower in key:
-                K_f = value
-                break
-        
-        if K_f is None:
-            return {'success': False, 'error': f"Freezing point constant not found for {solvent}"}
-    
-    return calculate_freezing_point_depression(
-        T_pure, T_solution, K_f, solute_mass, solvent, solvent_mass, ionization_factor
-    )
-
-def solve_boiling_point_problem(T_pure, T_solution, solvent, K_b=None, solute_mass=1, solvent_mass=None, ionization_factor=1):
-    """
-    Solve a boiling point elevation problem.
-    
-    Parameters:
-    -----------
-    T_pure : float
-        Boiling point of pure solvent in °C
-    T_solution : float
-        Boiling point of solution in °C
-    solvent : str
-        Chemical formula of the solvent
-    K_b : float, optional
-        Boiling point elevation constant in °C/m (if None, will look up from constants)
-    solute_mass : float, optional
-        Mass of solute in grams (default 1g)
-    solvent_mass : float, optional
-        Mass of solvent in grams (required)
-    ionization_factor : float, optional
-        van 't Hoff factor (default is 1 for non-electrolytes)
-    
-    Returns:
-    --------
-    dict
-        Result dictionary
-    """
-    if solvent_mass is None:
-        return {'success': False, 'error': "Solvent mass is required"}
-    
-    # Use lookup table for K_b if not provided
-    if K_b is None:
-        solvent_lower = solvent.lower()
-        for key, value in BOILING_POINT_CONSTANTS.items():
-            if key in solvent_lower or solvent_lower in key:
-                K_b = value
-                break
-        
-        if K_b is None:
-            return {'success': False, 'error': f"Boiling point constant not found for {solvent}"}
-    
-    return calculate_boiling_point_elevation(
-        T_pure, T_solution, K_b, solute_mass, solvent, solvent_mass, ionization_factor
-    )
-
-def solve_osmotic_pressure_problem(osmotic_pressure_atm, temperature_c, solution_volume_L, solute_mass, ionization_factor=1):
-    """
-    Solve an osmotic pressure problem.
-    
-    Parameters:
-    -----------
-    osmotic_pressure_atm : float
-        Osmotic pressure in atmospheres
-    temperature_c : float
-        Temperature in degrees Celsius
-    solution_volume_L : float
-        Volume of solution in liters
-    solute_mass : float
-        Mass of solute in grams
-    ionization_factor : float, optional
-        van 't Hoff factor (default is 1 for non-electrolytes)
-    
-    Returns:
-    --------
-    dict
-        Result dictionary
-    """
-    return calculate_osmotic_pressure(
-        osmotic_pressure_atm, temperature_c, solution_volume_L, solute_mass, ionization_factor
-    )
-
-def solve_vapor_pressure_problem(P_pure, P_solution, solute_mass, solvent, solvent_mass):
-    """
-    Solve a vapor pressure lowering problem.
-    
-    Parameters:
-    -----------
-    P_pure : float
-        Vapor pressure of pure solvent
-    P_solution : float
-        Vapor pressure of solution
-    solute_mass : float
-        Mass of solute in grams
-    solvent : str
-        Chemical formula of the solvent
-    solvent_mass : float
-        Mass of solvent in grams
-    
-    Returns:
-    --------
-    dict
-        Result dictionary
-    """
-    return calculate_vapor_pressure_lowering(
-        P_pure, P_solution, solute_mass, solvent, solvent_mass
-    )
-
-# Example usage for the specific question type:
-if __name__ == "__main__":
-    # Example: Solve the antifreeze problem from the question
-    molalities = [2.6, 3.3, 1.1, 5.7, 4.4]
-    
-    result = solve_multiple_choice_colligative_problem(
-        molalities=molalities,
-        property_type="freezing_point_depression",
-        solvent="water"
-    )
-    
-    if result['success']:
-        print("=== FREEZING POINT DEPRESSION COMPARISON ===")
-        for step in result['steps']:
-            print(step)
-        print(f"\nFinal Answer: {result['answer']['name']}")
-    else:
-        print(f"Error: {result['error']}")
-
-def calculate_molecular_weight_from_freezing_point(delta_T, K_f, solute_mass, solvent_mass, 
-                                                  ionization_factor=1, answer_choices=None):
-    """
-    Calculate molecular weight of solute from freezing point depression data.
-    
-    Parameters:
-    -----------
-    delta_T : float
-        Freezing point depression in °C (positive value)
-    K_f : float
-        Freezing point depression constant in °C/m
-    solute_mass : float
-        Mass of solute in grams
-    solvent_mass : float
-        Mass of solvent in grams
-    ionization_factor : float, optional
-        van 't Hoff factor (default is 1 for non-electrolytes)
-    answer_choices : list of float, optional
-        Multiple choice answers to find closest match
-    
-    Returns:
-    --------
-    dict
-        Dictionary containing calculation results and steps
-    """
-    # Convert solvent mass to kg
-    solvent_mass_kg = solvent_mass / 1000
-    
-    # Calculate molality using ΔTf = Kf × m × i
-    molality = delta_T / (K_f * ionization_factor)
-    
-    # Calculate moles of solute
-    moles_solute = molality * solvent_mass_kg
-    
-    # Calculate molecular weight
-    molecular_weight = solute_mass / moles_solute
-    
-    # Generate calculation steps
-    steps = [
-        f"Given data:",
-        f"  Freezing point depression (ΔTf) = {delta_T}°C",
-        f"  Freezing point depression constant (Kf) = {K_f}°C/m",
-        f"  Mass of solute = {solute_mass} g",
-        f"  Mass of solvent = {solvent_mass} g = {solvent_mass_kg} kg",
-        f"  van 't Hoff factor (i) = {ionization_factor}",
-        f"",
-        f"Step 1: Calculate molality using ΔTf = Kf × m × i",
-        f"  m = ΔTf / (Kf × i)",
-        f"  m = {delta_T} / ({K_f} × {ionization_factor})",
-        f"  m = {molality:.4f} mol/kg",
-        f"",
-        f"Step 2: Calculate moles of solute",
-        f"  moles = molality × kg of solvent",
-        f"  moles = {molality:.4f} × {solvent_mass_kg}",
-        f"  moles = {moles_solute:.6f} mol",
-        f"",
-        f"Step 3: Calculate molecular weight",
-        f"  MW = mass / moles",
-        f"  MW = {solute_mass} g / {moles_solute:.6f} mol",
-        f"  MW = {molecular_weight:.2f} g/mol"
-    ]
-    
-    result = {
-        'success': True,
-        'delta_T': delta_T,
-        'molality': molality,
-        'moles_solute': moles_solute,
-        'molecular_weight': molecular_weight,
-        'steps': steps
-    }
-    
-    # Find closest answer if choices provided
-    if answer_choices:
-        closest_answer = min(answer_choices, key=lambda x: abs(x - molecular_weight))
-        difference = abs(closest_answer - molecular_weight)
-        
-        steps.append(f"")
-        steps.append(f"Comparing to answer choices: {answer_choices}")
-        steps.append(f"Closest match: {closest_answer} g/mol (difference: {difference:.2f})")
-        
-        result['closest_answer'] = closest_answer
-        result['answer_difference'] = difference
-    
-    return result
-
-def calculate_molecular_weight_from_boiling_point(delta_T, K_b, solute_mass, solvent_mass, 
-                                                 ionization_factor=1, answer_choices=None):
-    """
-    Calculate molecular weight of solute from boiling point elevation data.
-    
-    Parameters:
-    -----------
-    delta_T : float
-        Boiling point elevation in °C (positive value)
-    K_b : float
-        Boiling point elevation constant in °C/m
-    solute_mass : float
-        Mass of solute in grams
-    solvent_mass : float
-        Mass of solvent in grams
-    ionization_factor : float, optional
-        van 't Hoff factor (default is 1 for non-electrolytes)
-    answer_choices : list of float, optional
-        Multiple choice answers to find closest match
-    
-    Returns:
-    --------
-    dict
-        Dictionary containing calculation results and steps
-    """
-    # Convert solvent mass to kg
-    solvent_mass_kg = solvent_mass / 1000
-    
-    # Calculate molality using ΔTb = Kb × m × i
-    molality = delta_T / (K_b * ionization_factor)
-    
-    # Calculate moles of solute
-    moles_solute = molality * solvent_mass_kg
-    
-    # Calculate molecular weight
-    molecular_weight = solute_mass / moles_solute
-    
-    # Generate calculation steps
-    steps = [
-        f"Given data:",
-        f"  Boiling point elevation (ΔTb) = {delta_T}°C",
-        f"  Boiling point elevation constant (Kb) = {K_b}°C/m",
-        f"  Mass of solute = {solute_mass} g",
-        f"  Mass of solvent = {solvent_mass} g = {solvent_mass_kg} kg",
-        f"  van 't Hoff factor (i) = {ionization_factor}",
-        f"",
-        f"Step 1: Calculate molality using ΔTb = Kb × m × i",
-        f"  m = ΔTb / (Kb × i)",
-        f"  m = {delta_T} / ({K_b} × {ionization_factor})",
-        f"  m = {molality:.4f} mol/kg",
-        f"",
-        f"Step 2: Calculate moles of solute",
-        f"  moles = molality × kg of solvent",
-        f"  moles = {molality:.4f} × {solvent_mass_kg}",
-        f"  moles = {moles_solute:.6f} mol",
-        f"",
-        f"Step 3: Calculate molecular weight",
-        f"  MW = mass / moles",
-        f"  MW = {solute_mass} g / {moles_solute:.6f} mol",
-        f"  MW = {molecular_weight:.2f} g/mol"
-    ]
-    
-    result = {
-        'success': True,
-        'delta_T': delta_T,
-        'molality': molality,
-        'moles_solute': moles_solute,
-        'molecular_weight': molecular_weight,
-        'steps': steps
-    }
-    
-    # Find closest answer if choices provided
-    if answer_choices:
-        closest_answer = min(answer_choices, key=lambda x: abs(x - molecular_weight))
-        difference = abs(closest_answer - molecular_weight)
-        
-        steps.append(f"")
-        steps.append(f"Comparing to answer choices: {answer_choices}")
-        steps.append(f"Closest match: {closest_answer} g/mol (difference: {difference:.2f})")
-        
-        result['closest_answer'] = closest_answer
-        result['answer_difference'] = difference
-    
-    return result
-
-def solve_molecular_weight_multiple_choice(problem_data):
-    """
-    Solve molecular weight problems with multiple choice answers.
+    Solve various types of colligative property problems.
     
     Parameters:
     -----------
     problem_data : dict
-        Dictionary containing problem parameters:
-        - 'method': 'freezing_point' or 'boiling_point'
-        - 'delta_T': temperature change in °C
-        - 'constant': Kf or Kb value
-        - 'solute_mass': mass of solute in grams
-        - 'solvent_mass': mass of solvent in grams
-        - 'ionization_factor': van 't Hoff factor (optional, default 1)
-        - 'answer_choices': list of possible answers
+        Problem configuration with keys:
+        - 'type': 'molecular_weight' or 'compare_solutions'
+        - 'method': calculation method (for molecular weight problems)
+        - 'solvent': solvent name (default: "water")
+        - Other method-specific parameters
     
     Returns:
     --------
     dict
-        Complete solution with steps and answer
+        Complete solution
     """
-    method = problem_data.get('method')
-    delta_T = problem_data.get('delta_T')
-    constant = problem_data.get('constant')
-    solute_mass = problem_data.get('solute_mass')
-    solvent_mass = problem_data.get('solvent_mass')
-    ionization_factor = problem_data.get('ionization_factor', 1)
-    answer_choices = problem_data.get('answer_choices')
+    problem_type = problem_data.get('type')
+    solvent = problem_data.get('solvent', 'water')
+    calculator = ColligativePropertyCalculator(solvent)
     
-    # Validate inputs
-    required_params = ['method', 'delta_T', 'constant', 'solute_mass', 'solvent_mass']
-    for param in required_params:
-        if problem_data.get(param) is None:
-            return {'success': False, 'error': f"Missing required parameter: {param}"}
+    if problem_type == 'molecular_weight':
+        method = problem_data.get('method')
+        if not method:
+            return {'success': False, 'error': 'Method is required for molecular weight problems'}
+        
+        # Remove non-method parameters
+        method_params = {k: v for k, v in problem_data.items() 
+                        if k not in ['type', 'method', 'solvent']}
+        
+        return calculator.calculate_molecular_weight(method, **method_params)
     
-    if method == 'freezing_point':
-        return calculate_molecular_weight_from_freezing_point(
-            delta_T, constant, solute_mass, solvent_mass, ionization_factor, answer_choices
-        )
-    elif method == 'boiling_point':
-        return calculate_molecular_weight_from_boiling_point(
-            delta_T, constant, solute_mass, solvent_mass, ionization_factor, answer_choices
-        )
+    elif problem_type == 'compare_solutions':
+        solutions = problem_data.get('solutions')
+        property_type = problem_data.get('property_type', 'freezing_point_depression')
+        
+        if not solutions:
+            return {'success': False, 'error': 'Solutions list is required'}
+        
+        return calculator.compare_solutions(solutions, property_type)
+    
     else:
-        return {'success': False, 'error': f"Unsupported method: {method}"}
+        return {'success': False, 'error': f'Unsupported problem type: {problem_type}'}
 
-def solve_freezing_point_problem_v2(problem_type="calculate_mw", **kwargs):
-    """
-    Enhanced freezing point problem solver that can handle different problem types.
+
+# Example usage
+if __name__ == "__main__":
+    # Example 1: Compare solutions for freezing point depression
+    print("=== SOLUTION COMPARISON EXAMPLE ===")
+    solutions = [
+        {'molality': 2.6, 'name': '2.6 m solution'},
+        {'molality': 3.3, 'name': '3.3 m solution'},
+        {'molality': 1.1, 'name': '1.1 m solution'},
+        {'molality': 5.7, 'name': '5.7 m solution'},
+        {'molality': 4.4, 'name': '4.4 m solution'}
+    ]
     
-    Parameters:
-    -----------
-    problem_type : str
-        Type of problem: "calculate_mw" (calculate molecular weight) or "compare_solutions"
-    **kwargs : dict
-        Problem-specific parameters
+    result = compare_colligative_properties(solutions, "freezing_point_depression", "water")
+    if result['success']:
+        for step in result['steps']:
+            print(step)
     
-    Returns:
-    --------
-    dict
-        Solution results
-    """
-    if problem_type == "calculate_mw":
-        # For molecular weight calculations from freezing point data
-        return solve_molecular_weight_multiple_choice({
-            'method': 'freezing_point',
-            **kwargs
-        })
-    elif problem_type == "compare_solutions":
-        # For comparing multiple solutions (your existing functionality)
-        return solve_multiple_choice_colligative_problem(
-            property_type="freezing_point_depression",
-            **kwargs
-        )
-    else:
-        return {'success': False, 'error': f"Unsupported problem type: {problem_type}"}
+    print("\n" + "="*50 + "\n")
+    
+    # Example 2: Calculate molecular weight from freezing point data
+    print("=== MOLECULAR WEIGHT CALCULATION EXAMPLE ===")
+    mw_result = calculate_molecular_weight(
+        method="freezing_point",
+        solvent="water",
+        delta_T=1.5,  # 1.5°C depression
+        solute_mass=2.0,  # 2.0 g solute
+        solvent_mass=100.0,  # 100 g water
+        answer_choices=[46, 56, 66, 76, 86]
+    )
+    
+    if mw_result['success']:
+        for step in mw_result['steps']:
+            print(step)

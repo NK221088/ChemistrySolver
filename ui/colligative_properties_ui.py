@@ -11,7 +11,27 @@ from chemistry_solver.colligative_properties import (
     calculate_molecular_weight_from_freezing_point,
     calculate_molecular_weight_from_boiling_point,
     FREEZING_POINT_CONSTANTS,
-    BOILING_POINT_CONSTANTS
+    BOILING_POINT_CONSTANTS,
+    compare_solution_properties,
+    solve_multiple_choice_colligative_problem,
+    calculate_freezing_point_depression,
+    calculate_boiling_point_elevation,
+    calculate_osmotic_pressure,
+    calculate_vapor_pressure_lowering,
+    solve_freezing_point_problem,
+    solve_boiling_point_problem,
+    solve_osmotic_pressure_problem,
+    solve_vapor_pressure_problem,
+    calculate_molecular_weight_from_freezing_point,
+    calculate_molecular_weight_from_boiling_point,
+    solve_molecular_weight_multiple_choice,
+    solve_freezing_point_problem_v2
+    
+    
+    
+    
+    
+    
 )
 
 class ColligativePropertiesUI:

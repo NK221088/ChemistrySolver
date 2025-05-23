@@ -159,16 +159,166 @@ def calculate_temperature_for_rate_constant(activation_energy, k1, T1_k, k2):
     if T1_k <= 0:
         raise ValueError("Temperature must be positive (in Kelvin)")
     
+    # Additional validation for reasonable activation energy
+    if activation_energy < 1000:
+        raise ValueError(f"Activation energy ({activation_energy} J/mol) seems too low. "
+                        "Typical values are 20,000-200,000 J/mol. Please check your units.")
+    
     # ln(k2/k1) = -(Ea/R) * (1/T2 - 1/T1)
     # Solving for T2: 1/T2 = 1/T1 - (R/Ea) * ln(k2/k1)
     ln_ratio = math.log(k2 / k1)
+    
+    # Check if the rate change is reasonable for the given activation energy
+    # For very large rate changes with low Ea, the calculation might be impossible
     inverse_T2 = (1 / T1_k) - (R / activation_energy) * ln_ratio
     
     if inverse_T2 <= 0:
-        raise ValueError("Calculated temperature is not physically meaningful")
+        # Provide more detailed error message
+        if ln_ratio > 0:  # k2 > k1 (rate increase)
+            raise ValueError(
+                f"Cannot achieve this rate increase with the given activation energy.\n"
+                f"The calculation gives 1/T2 = {inverse_T2:.6f}, which is not physical.\n"
+                f"This suggests either:\n"
+                f"1. The activation energy ({activation_energy} J/mol) is too low\n"
+                f"2. The desired rate increase ({k2/k1:.2f}×) is too large for this system\n"
+                f"3. There's an error in your input values"
+            )
+        else:  # k2 < k1 (rate decrease)
+            raise ValueError(
+                f"Cannot achieve this rate decrease with the given conditions.\n"
+                f"The calculation gives 1/T2 = {inverse_T2:.6f}, which is not physical."
+            )
     
-    return 1 / inverse_T2
+    T2 = 1 / inverse_T2
+    
+    # Additional sanity check - temperature should be reasonable
+    if T2 > 5000:  # Arbitrary upper limit
+        raise ValueError(f"Calculated temperature ({T2:.1f} K) is unreasonably high. "
+                        "Please check your input values.")
+    
+    return T2
 
+def _handle_temperature_for_rate_calculation(self):
+    """Handle calculation of temperature for desired rate constant."""
+    print("\n===== TEMPERATURE FOR DESIRED RATE CONSTANT =====")
+    
+    try:
+        # Get activation energy with unit choice
+        while True:
+            ea_unit = input("Enter activation energy units - Joules (J) or Kilojoules (kJ)? Enter J or kJ: ").strip().upper()
+            if ea_unit not in ['J', 'KJ']:
+                print("Error: Please enter 'J' for Joules or 'kJ' for Kilojoules.")
+                continue
+            
+            if ea_unit == 'J':
+                activation_energy = float(input("Enter activation energy (J/mol): "))
+                if activation_energy <= 0:
+                    print("Error: Activation energy must be positive.")
+                    continue
+                elif activation_energy < 1000:
+                    confirm = input(f"Warning: {activation_energy} J/mol seems very low. "
+                                  f"Did you mean kJ/mol? Typical values are 20-200 kJ/mol. "
+                                  f"Continue with {activation_energy} J/mol anyway? (y/n): ").strip().lower()
+                    if confirm != 'y':
+                        continue
+                break
+            else:  # kJ
+                activation_energy_kj = float(input("Enter activation energy (kJ/mol): "))
+                if activation_energy_kj <= 0:
+                    print("Error: Activation energy must be positive.")
+                    continue
+                activation_energy = activation_energy_kj * 1000  # Convert to J/mol
+                print(f"Converting {activation_energy_kj} kJ/mol to {activation_energy} J/mol")
+                break
+        
+        print("\nEnter initial conditions:")
+        
+        # Get initial rate constant
+        k1 = float(input("Initial rate constant k1: "))
+        if k1 <= 0:
+            print("Error: Rate constant must be positive.")
+            return
+        
+        # Get temperature unit choice
+        temp1_choice = input("Initial temperature in Celsius (C) or Kelvin (K)? Enter C or K: ").strip().upper()
+         
+        if temp1_choice == "C":
+            T1_celsius = float(input("Initial temperature T1 in Celsius: "))
+            if T1_celsius < -273.15:
+                print("Error: Temperature cannot be below absolute zero (-273.15°C).")
+                return
+            T1_kelvin = celsius_to_kelvin(T1_celsius)
+        elif temp1_choice == "K":
+            T1_kelvin = float(input("Initial temperature T1 in Kelvin: "))
+            if T1_kelvin <= 0:
+                print("Error: Temperature in Kelvin must be positive.")
+                return
+            T1_celsius = kelvin_to_celsius(T1_kelvin)
+        else:
+            print("Error: Please enter 'C' for Celsius or 'K' for Kelvin.")
+            return
+        
+        # Get desired rate constant
+        k2 = float(input("\nEnter desired rate constant k2: "))
+        if k2 <= 0:
+            print("Error: Rate constant must be positive.")
+            return
+        
+        # Warn about extreme rate changes
+        rate_ratio = k2 / k1
+        if rate_ratio > 1000 or rate_ratio < 0.001:
+            print(f"Warning: You're requesting a {rate_ratio:.1f}× change in rate constant.")
+            print("This might not be achievable with reasonable temperatures.")
+        
+        # Calculate the required temperature
+        T2_kelvin = calculate_temperature_for_rate_constant(activation_energy, k1, T1_kelvin, k2)
+        T2_celsius = kelvin_to_celsius(T2_kelvin)
+        
+        # Display results
+        display_results_header()
+        if activation_energy >= 1000:
+            print(f"Activation energy (Ea): {activation_energy:,.0f} J/mol ({activation_energy/1000:.1f} kJ/mol)")
+        else:
+            print(f"Activation energy (Ea): {activation_energy:,.0f} J/mol")
+        print(f"Initial conditions: k1 = {k1} at T1 = {T1_celsius:.1f}°C ({T1_kelvin:.2f} K)")
+        print(f"Desired rate constant: k2 = {k2}")
+        print(f"Required temperature: T2 = {T2_celsius:.1f}°C ({T2_kelvin:.2f} K)")
+        
+        temp_change = T2_celsius - T1_celsius
+        rate_change = k2 / k1
+        print(f"\nTemperature change: {temp_change:+.1f}°C")
+        print(f"Rate constant change: {rate_change:.2f}× {'increase' if rate_change > 1 else 'decrease'}")
+        
+        print("\nFormula used: 1/T2 = 1/T1 - (R/Ea) × ln(k2/k1)")
+        ln_ratio = math.log(k2/k1)
+        print(f"ln(k2/k1) = ln({k2}/{k1}) = {ln_ratio:.6f}")
+        print(f"1/T2 = 1/{T1_kelvin:.2f} - (8.314/{activation_energy}) × {ln_ratio:.6f}")
+        print(f"1/T2 = {1/T1_kelvin:.8f} - {8.314/activation_energy * ln_ratio:.8f}")
+        print(f"1/T2 = {1/T2_kelvin:.8f}")
+        print(f"T2 = {T2_kelvin:.2f} K = {T2_celsius:.1f}°C")
+        
+    except ValueError as e:
+        if "Please enter valid numbers" in str(e):
+            print("Error: Please enter valid numbers for all values.")
+        else:
+            print(f"Error: {str(e)}")
+    except Exception as e:
+        print(f"Error: An unexpected error occurred: {str(e)}")
+    
+    input("\nPress Enter to continue...")
+
+# Helper functions (if not already defined)
+def celsius_to_kelvin(celsius):
+    return celsius + 273.15
+
+def kelvin_to_celsius(kelvin):
+    return kelvin - 273.15
+
+def display_results_header():
+    print("\n" + "="*50)
+    print("RESULTS")
+    print("="*50)
+    
 def calculate_activation_energy(k1, T1_k, k2, T2_k):
     """
     Calculate activation energy from two rate constants at different temperatures.

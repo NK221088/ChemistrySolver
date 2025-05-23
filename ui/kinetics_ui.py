@@ -454,27 +454,50 @@ class KineticsUI:
         print("\n===== TEMPERATURE FOR DESIRED RATE CONSTANT =====")
         
         try:
+            # Get activation energy
             activation_energy = float(input("Enter activation energy (J/mol): "))
+            if activation_energy <= 0:
+                print("Error: Activation energy must be positive.")
+                return
             
             print("\nEnter initial conditions:")
-            k1 = float(input("Initial rate constant k1: "))
             
+            # Get initial rate constant
+            k1 = float(input("Initial rate constant k1: "))
+            if k1 <= 0:
+                print("Error: Rate constant must be positive.")
+                return
+            
+            # Get temperature unit choice
             temp1_choice = input("Initial temperature in Celsius (C) or Kelvin (K)? Enter C or K: ").strip().upper()
+             
             if temp1_choice == "C":
                 T1_celsius = float(input("Initial temperature T1 in Celsius: "))
+                if T1_celsius < -273.15:
+                    print("Error: Temperature cannot be below absolute zero (-273.15°C).")
+                    return
                 T1_kelvin = celsius_to_kelvin(T1_celsius)
             elif temp1_choice == "K":
                 T1_kelvin = float(input("Initial temperature T1 in Kelvin: "))
+                if T1_kelvin <= 0:
+                    print("Error: Temperature in Kelvin must be positive.")
+                    return
                 T1_celsius = kelvin_to_celsius(T1_kelvin)
             else:
-                print("Invalid choice.")
+                print("Error: Please enter 'C' for Celsius or 'K' for Kelvin.")
                 return
             
+            # Get desired rate constant
             k2 = float(input("\nEnter desired rate constant k2: "))
+            if k2 <= 0:
+                print("Error: Rate constant must be positive.")
+                return
             
+            # Calculate the required temperature
             T2_kelvin = calculate_temperature_for_rate_constant(activation_energy, k1, T1_kelvin, k2)
             T2_celsius = kelvin_to_celsius(T2_kelvin)
             
+            # Display results
             display_results_header()
             print(f"Activation energy (Ea): {activation_energy:,.0f} J/mol")
             print(f"Initial conditions: k1 = {k1} at T1 = {T1_celsius:.1f}°C ({T1_kelvin:.2f} K)")
@@ -496,6 +519,10 @@ class KineticsUI:
             
         except ValueError:
             print("Error: Please enter valid numbers for all values.")
+        except Exception as e:
+            print(f"Error: An unexpected error occurred: {str(e)}")
+        
+        input("\nPress Enter to continue...")
     
     def _handle_complete_arrhenius_analysis(self):
         """Handle complete Arrhenius equation analysis."""

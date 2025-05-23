@@ -650,6 +650,217 @@ def solve_mixture_problem(substances):
     }
 
 #######################################
+# Equilibrium Constant Functions
+#######################################
+
+def calculate_equilibrium_constant(delta_g_standard, temperature_k):
+    """
+    Calculate the equilibrium constant using the relationship ΔG° = -RT ln(K).
+    
+    Parameters:
+        delta_g_standard (float): Standard Gibbs free energy change in kJ/mol
+        temperature_k (float): Temperature in Kelvin
+        
+    Returns:
+        float: Equilibrium constant K
+    """
+    # Convert ΔG° from kJ/mol to J/mol for calculation
+    delta_g_j = delta_g_standard * 1000
+    
+    # R in J/(mol·K)
+    R = R_IDEAL_GAS['J/(mol·K)']
+    
+    # Calculate K using K = exp(-ΔG°/RT)
+    K = math.exp(-delta_g_j / (R * temperature_k))
+    
+    return K
+
+
+def calculate_delta_g_from_enthalpy_entropy(delta_h_standard, delta_s_standard, temperature_k):
+    """
+    Calculate the standard Gibbs free energy change using ΔG° = ΔH° - TΔS°.
+    
+    Parameters:
+        delta_h_standard (float): Standard enthalpy change in kJ/mol
+        delta_s_standard (float): Standard entropy change in J/(mol·K)
+        temperature_k (float): Temperature in Kelvin
+        
+    Returns:
+        float: Standard Gibbs free energy change in kJ/mol
+    """
+    # Convert ΔS° from J/(mol·K) to kJ/(mol·K)
+    delta_s_kj = delta_s_standard / 1000
+    
+    # Calculate ΔG° = ΔH° - TΔS°
+    delta_g_standard = delta_h_standard - temperature_k * delta_s_kj
+    
+    return delta_g_standard
+
+
+def solve_equilibrium_constant_problem(
+    delta_h_standard=None,     # kJ/mol
+    delta_s_standard=None,     # J/(mol·K)
+    delta_g_standard=None,     # kJ/mol
+    temperature_c=None,        # °C
+    temperature_k=None,        # K
+    reaction_string=None
+) -> Dict[str, Any]:
+    """
+    Solve equilibrium constant problems using thermodynamic data.
+    
+    Parameters:
+        delta_h_standard (float, optional): Standard enthalpy change in kJ/mol
+        delta_s_standard (float, optional): Standard entropy change in J/(mol·K)
+        delta_g_standard (float, optional): Standard Gibbs free energy change in kJ/mol
+        temperature_c (float, optional): Temperature in Celsius
+        temperature_k (float, optional): Temperature in Kelvin
+        reaction_string (str, optional): The balanced chemical equation
+        
+    Returns:
+        Dict[str, Any]: Dictionary containing results and solution steps
+    """
+    steps = []
+    
+    # Handle temperature conversion
+    if temperature_k is None and temperature_c is not None:
+        temperature_k = temperature_c + 273.15
+        steps.append(f"Step 1: Convert temperature to Kelvin:")
+        steps.append(f"T = {temperature_c} °C + 273.15 = {temperature_k:.2f} K")
+        steps.append("")
+    elif temperature_c is None and temperature_k is not None:
+        temperature_c = temperature_k - 273.15
+    
+    if temperature_k is None:
+        raise ValueError("Temperature must be provided in either Celsius or Kelvin")
+    
+    # Add reaction information if provided
+    if reaction_string:
+        steps.append(f"Balanced reaction: {reaction_string}")
+        steps.append("")
+    
+    # Calculate ΔG° if not provided
+    if delta_g_standard is None:
+        if delta_h_standard is not None and delta_s_standard is not None:
+            delta_g_standard = calculate_delta_g_from_enthalpy_entropy(
+                delta_h_standard, delta_s_standard, temperature_k
+            )
+            
+            step_num = len([s for s in steps if s.startswith("Step")]) + 1
+            steps.append(f"Step {step_num}: Calculate ΔG° using ΔG° = ΔH° - TΔS°:")
+            steps.append(f"ΔG° = {delta_h_standard} kJ/mol - ({temperature_k:.2f} K)({delta_s_standard} J/(mol·K) × 1 kJ/1000 J)")
+            steps.append(f"ΔG° = {delta_h_standard} kJ/mol - ({temperature_k:.2f})({delta_s_standard/1000:.6f} kJ/(mol·K))")
+            steps.append(f"ΔG° = {delta_h_standard} kJ/mol - {temperature_k * delta_s_standard/1000:.3f} kJ/mol")
+            steps.append(f"ΔG° = {delta_g_standard:.3f} kJ/mol")
+            steps.append("")
+        else:
+            raise ValueError("Either ΔG° must be provided, or both ΔH° and ΔS° must be provided")
+    
+    # Calculate equilibrium constant
+    K = calculate_equilibrium_constant(delta_g_standard, temperature_k)
+    
+    step_num = len([s for s in steps if s.startswith("Step")]) + 1
+    steps.append(f"Step {step_num}: Calculate the equilibrium constant using ΔG° = -RT ln(K):")
+    steps.append(f"ln(K) = -ΔG°/RT")
+    steps.append(f"ln(K) = -({delta_g_standard:.3f} kJ/mol × 1000 J/kJ) / ({R_IDEAL_GAS['J/(mol·K)']} J/(mol·K) × {temperature_k:.2f} K)")
+    steps.append(f"ln(K) = -{delta_g_standard * 1000:.1f} J/mol / {R_IDEAL_GAS['J/(mol·K)'] * temperature_k:.1f} J/mol")
+    steps.append(f"ln(K) = {-delta_g_standard * 1000 / (R_IDEAL_GAS['J/(mol·K)'] * temperature_k):.6f}")
+    steps.append(f"K = e^({-delta_g_standard * 1000 / (R_IDEAL_GAS['J/(mol·K)'] * temperature_k):.6f})")
+    steps.append(f"K = {K:.2e}")
+    
+    return {
+        "reaction": reaction_string,
+        "temperature_c": temperature_c,
+        "temperature_k": temperature_k,
+        "delta_h_standard": delta_h_standard,
+        "delta_s_standard": delta_s_standard,
+        "delta_g_standard": delta_g_standard,
+        "equilibrium_constant": K,
+        "steps": steps
+    }
+
+
+def solve_haber_bosch_problem(temperature_c=25):
+    """
+    Solve the specific Haber-Bosch process equilibrium constant problem.
+    
+    Parameters:
+        temperature_c (float): Temperature in Celsius (default 25°C)
+        
+    Returns:
+        Dict[str, Any]: Dictionary containing results and solution steps
+    """
+    # Thermodynamic data for the Haber-Bosch process at standard conditions
+    # N2(g) + 3H2(g) ⇌ 2NH3(g)
+    
+    # Standard enthalpies of formation (kJ/mol)
+    delta_hf_nh3 = -45.9  # kJ/mol
+    delta_hf_n2 = 0       # kJ/mol (element)
+    delta_hf_h2 = 0       # kJ/mol (element)
+    
+    # Standard entropies (J/(mol·K))
+    s_nh3 = 192.8     # J/(mol·K)
+    s_n2 = 191.6      # J/(mol·K)
+    s_h2 = 130.7      # J/(mol·K)
+    
+    # Calculate ΔH° for the reaction
+    delta_h_reaction = (2 * delta_hf_nh3) - (1 * delta_hf_n2 + 3 * delta_hf_h2)
+    delta_h_reaction = (2 * -45.9) - (0 + 0) = -91.8  # kJ/mol
+    
+    # Calculate ΔS° for the reaction
+    delta_s_reaction = (2 * s_nh3) - (1 * s_n2 + 3 * s_h2)
+    delta_s_reaction = (2 * 192.8) - (191.6 + 3 * 130.7)
+    delta_s_reaction = 385.6 - (191.6 + 392.1) = 385.6 - 583.7 = -198.1  # J/(mol·K)
+    
+    # Solve using the general function
+    result = solve_equilibrium_constant_problem(
+        delta_h_standard=delta_h_reaction,
+        delta_s_standard=delta_s_reaction,
+        temperature_c=temperature_c,
+        reaction_string="N₂(g) + 3H₂(g) ⇌ 2NH₃(g)"
+    )
+    
+    # Add problem-specific information
+    result["delta_h_formation"] = {
+        "NH3": delta_hf_nh3,
+        "N2": delta_hf_n2,
+        "H2": delta_hf_h2
+    }
+    result["standard_entropies"] = {
+        "NH3": s_nh3,
+        "N2": s_n2,
+        "H2": s_h2
+    }
+    
+    # Insert calculation details at the beginning
+    detailed_steps = [
+        "Given thermodynamic data:",
+        f"ΔHf°(NH₃) = {delta_hf_nh3} kJ/mol",
+        f"ΔHf°(N₂) = {delta_hf_n2} kJ/mol",
+        f"ΔHf°(H₂) = {delta_hf_h2} kJ/mol",
+        f"S°(NH₃) = {s_nh3} J/(mol·K)",
+        f"S°(N₂) = {s_n2} J/(mol·K)",
+        f"S°(H₂) = {s_h2} J/(mol·K)",
+        "",
+        "Step 1: Calculate ΔH° for the reaction:",
+        "ΔH°rxn = Σ(coefficients × ΔHf°)products - Σ(coefficients × ΔHf°)reactants",
+        f"ΔH°rxn = [2 × ({delta_hf_nh3})] - [1 × ({delta_hf_n2}) + 3 × ({delta_hf_h2})]",
+        f"ΔH°rxn = [{2 * delta_hf_nh3}] - [{delta_hf_n2 + 3 * delta_hf_h2}]",
+        f"ΔH°rxn = {delta_h_reaction} kJ/mol",
+        "",
+        "Step 2: Calculate ΔS° for the reaction:",
+        "ΔS°rxn = Σ(coefficients × S°)products - Σ(coefficients × S°)reactants",
+        f"ΔS°rxn = [2 × {s_nh3}] - [1 × {s_n2} + 3 × {s_h2}]",
+        f"ΔS°rxn = [{2 * s_nh3}] - [{s_n2 + 3 * s_h2}]",
+        f"ΔS°rxn = {delta_s_reaction} J/(mol·K)",
+        ""
+    ]
+    
+    # Combine with existing steps
+    result["steps"] = detailed_steps + result["steps"]
+    
+    return result
+
+#######################################
 # Clausius-Clapeyron Equation Functions
 #######################################
 

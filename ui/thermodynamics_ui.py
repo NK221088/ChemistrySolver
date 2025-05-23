@@ -6,7 +6,7 @@ from chemistry_solver.thermodynamics import (calculate_heat, calculate_temperatu
                           calculate_molar_heat, solve_thermal_equilibrium, solve_thermal_equilibrium_with_molar_heat,
                           handle_heat_transfer_problem, handle_heat_transfer_with_molar_heat, solve_mixture_problem,
                           calculate_boiling_point_with_pressure, calculate_pressure_with_temperature, 
-                          calculate_heat_of_vaporization, parse_reaction_string, solve_enthalpy_problem)
+                          calculate_heat_of_vaporization, parse_reaction_string, solve_enthalpy_problem, solve_equilibrium_constant_problem, solve_haber_bosch_problem)
 
 # Import the name_to_formula module
 try:
@@ -66,7 +66,7 @@ class ThermodynamicsUI:
         
         while True:
             self._display_menu()
-            choice = input("\nEnter choice (0-8): ").strip()
+            choice = input("\nEnter choice (0-9): ").strip()  # Changed from 0-8 to 0-9
             
             if choice == "0":
                 # Return to main menu
@@ -87,6 +87,8 @@ class ThermodynamicsUI:
                 self._handle_clausius_clapeyron_calculations()
             elif choice == "8":
                 self._handle_hess_law_calculations()
+            elif choice == "9":  # NEW OPTION
+                self._handle_equilibrium_constant_calculations()
             else:
                 print("Invalid choice. Please try again.")
             
@@ -103,6 +105,7 @@ class ThermodynamicsUI:
         [6] Solve multi-substance thermal equilibrium problem
         [7] Clausius-Clapeyron equation calculations
         [8] Hess's Law calculations
+        [9] Equilibrium constant calculations
         [0] Return to main menu
         """
         print(menu)
@@ -486,5 +489,107 @@ class ThermodynamicsUI:
             for step in result["steps"]:
                 print(step)
             
+        else:
+            print("Invalid choice.")
+    
+    def _handle_equilibrium_constant_calculations(self):
+        """
+        Handler function for equilibrium constant calculations.
+        """
+        print("\n=== Equilibrium Constant Calculations ===")
+        print("Select the type of calculation:")
+        print("[1] Calculate equilibrium constant from thermodynamic data")
+        print("[2] Haber-Bosch process example")
+        
+        choice = input("\nEnter choice (1-2): ").strip()
+        
+        if choice == "1":
+            print("\n--- Calculate Equilibrium Constant ---")
+            print("You can provide either:")
+            print("- ΔG° directly, OR")
+            print("- Both ΔH° and ΔS° to calculate ΔG°")
+            
+            # Get reaction string (optional)
+            reaction = input("\nEnter balanced chemical equation (optional): ").strip() or None
+            
+            # Get temperature
+            temp_choice = input("Enter temperature in (C)elsius or (K)elvin? ").lower()
+            if temp_choice.startswith('c'):
+                temp_c = float(input("Enter temperature (°C): "))
+                temp_k = None
+            else:
+                temp_k = float(input("Enter temperature (K): "))
+                temp_c = None
+            
+            # Get thermodynamic data
+            data_choice = input("\nDo you have ΔG° directly? (y/n): ").lower()
+            
+            if data_choice == 'y':
+                delta_g = float(input("Enter ΔG° (kJ/mol): "))
+                delta_h = None
+                delta_s = None
+            else:
+                print("Enter ΔH° and ΔS° to calculate ΔG°:")
+                delta_h = float(input("Enter ΔH° (kJ/mol): "))
+                delta_s = float(input("Enter ΔS° (J/(mol·K)): "))
+                delta_g = None
+            
+            # Solve the problem
+            result = solve_equilibrium_constant_problem(
+                delta_h_standard=delta_h,
+                delta_s_standard=delta_s,
+                delta_g_standard=delta_g,
+                temperature_c=temp_c,
+                temperature_k=temp_k,
+                reaction_string=reaction
+            )
+            
+            display_results_header()
+            for step in result["steps"]:
+                print(step)
+            
+            print(f"\n=== FINAL RESULTS ===")
+            print(f"Temperature: {result['temperature_c']:.2f} °C ({result['temperature_k']:.2f} K)")
+            if result['delta_g_standard'] is not None:
+                print(f"ΔG°: {result['delta_g_standard']:.3f} kJ/mol")
+            print(f"Equilibrium constant (K): {result['equilibrium_constant']:.2e}")
+            
+            # Interpret the result
+            if result['equilibrium_constant'] > 1:
+                print("Since K > 1, the reaction favors products at equilibrium.")
+            elif result['equilibrium_constant'] < 1:
+                print("Since K < 1, the reaction favors reactants at equilibrium.")
+            else:
+                print("Since K ≈ 1, reactants and products are present in similar amounts at equilibrium.")
+                
+        elif choice == "2":
+            print("\n--- Haber-Bosch Process Example ---")
+            print("Reaction: N₂(g) + 3H₂(g) ⇌ 2NH₃(g)")
+            
+            temp_c = float(input("Enter temperature (°C, default=25): ") or "25")
+            
+            result = solve_haber_bosch_problem(temperature_c=temp_c)
+            
+            display_results_header()
+            for step in result["steps"]:
+                print(step)
+            
+            print(f"\n=== FINAL RESULTS ===")
+            print(f"Reaction: {result['reaction']}")
+            print(f"Temperature: {result['temperature_c']:.2f} °C ({result['temperature_k']:.2f} K)")
+            print(f"ΔH°: {result['delta_h_standard']:.1f} kJ/mol")
+            print(f"ΔS°: {result['delta_s_standard']:.1f} J/(mol·K)")
+            print(f"ΔG°: {result['delta_g_standard']:.3f} kJ/mol")
+            print(f"Equilibrium constant (K): {result['equilibrium_constant']:.2e}")
+            
+            # Interpret the result
+            if result['equilibrium_constant'] > 1:
+                print("Since K > 1, the formation of ammonia is thermodynamically favored.")
+            else:
+                print("Since K < 1, the reaction favors the reactants (N₂ and H₂).")
+            
+            print("\nNote: While this reaction may be thermodynamically favorable,")
+            print("kinetic factors (activation energy) make it slow without a catalyst.")
+                
         else:
             print("Invalid choice.")

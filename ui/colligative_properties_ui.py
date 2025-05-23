@@ -55,45 +55,109 @@ class ColligativePropertiesUI:
         """
         print(menu)
     
+    def _get_solvent_info(self, constants_dict, constant_name):
+        """Helper method to get solvent information and constant."""
+        solvent = input("Enter solvent name or formula (e.g., water, H2O): ").strip()
+        
+        # Ask if user wants to use known constants
+        use_lookup = input("Use known constant from database? (y/n): ").lower().startswith('y')
+        constant_value = None
+        
+        if use_lookup:
+            print(f"\nAvailable solvents with known {constant_name} constants:")
+            solvent_list = list(constants_dict.items())
+            for i, (solvent_name, constant) in enumerate(solvent_list, 1):
+                print(f"  [{i}] {solvent_name.title()} ({constant_name} = {constant} °C/m)")
+            
+            choice = input(f"\nSelect a solvent (1-{len(solvent_list)}) or press Enter to continue with '{solvent}': ").strip()
+            if choice.isdigit():
+                idx = int(choice) - 1
+                if 0 <= idx < len(solvent_list):
+                    selected_solvent, constant_value = solvent_list[idx]
+                    solvent = selected_solvent
+                    print(f"Selected: {selected_solvent.title()} with {constant_name} = {constant_value} °C/m")
+        
+        # If no constant selected, ask user to provide it
+        if constant_value is None:
+            constant_input = input(f"Enter {constant_name} constant for {solvent} (°C/m) [leave blank for auto-lookup]: ").strip()
+            if constant_input:
+                constant_value = float(constant_input)
+        
+        return solvent, constant_value
+    
+    def _get_ionization_factor(self):
+        """Helper method to get van't Hoff factor."""
+        ionization = input("Is the solute an electrolyte? (y/n): ").lower().startswith('y')
+        ionization_factor = 1
+        if ionization:
+            while True:
+                try:
+                    ionization_factor = float(input("Enter van't Hoff factor (i) [typical values: 1=nonelectrolyte, 2=NaCl, 3=CaCl2]: "))
+                    if ionization_factor > 0:
+                        break
+                    else:
+                        print("van't Hoff factor must be positive.")
+                except ValueError:
+                    print("Please enter a valid number.")
+        return ionization_factor
+    
+    def _display_result_summary(self, result, calculation_type):
+        """Display a summary of calculation results."""
+        print(f"\n{'='*60}")
+        print(f"CALCULATION SUMMARY - {calculation_type.upper()}")
+        print(f"{'='*60}")
+        
+        if result['success']:
+            # Display key results
+            print(f"Molecular Weight: {result['molecular_weight']:.2f} g/mol")
+            if 'closest_answer' in result:
+                print(f"Closest Common Answer: {result['closest_answer']} g/mol")
+            
+            # Display specific properties based on calculation type
+            if 'delta_T' in result:
+                temp_change = "Depression" if calculation_type == "freezing point" else "Elevation"
+                print(f"Temperature {temp_change} (ΔT): {result['delta_T']:.4f} °C")
+            if 'molality' in result:
+                print(f"Molality: {result['molality']:.6f} mol/kg")
+            if 'moles_solute' in result:
+                print(f"Moles of Solute: {result['moles_solute']:.6f} mol")
+            if 'mole_fraction_solute' in result:
+                print(f"Mole Fraction of Solute: {result['mole_fraction_solute']:.6f}")
+            if 'delta_P' in result:
+                print(f"Vapor Pressure Lowering (ΔP): {result['delta_P']:.4f}")
+            
+            print(f"\n{'DETAILED CALCULATION STEPS'}")
+            print(f"{'-'*60}")
+            display_steps(result['steps'])
+        else:
+            print(f"❌ ERROR: {result['error']}")
+    
     def _handle_freezing_point_depression(self):
         """Handle freezing point depression calculations."""
-        print("\n===== FREEZING POINT DEPRESSION CALCULATOR =====")
-        print("\nThis calculator determines molecular weight from freezing point depression.")
+        print("\n" + "="*70)
+        print("FREEZING POINT DEPRESSION CALCULATOR")
+        print("="*70)
+        print("This calculator determines molecular weight from freezing point depression.")
+        print("Formula: ΔTf = Kf × m × i")
+        print()
         
         try:
-            # Get input parameters
+            # Get temperature data
             T_pure = float(input("Enter freezing point of pure solvent (°C): "))
             T_solution = float(input("Enter freezing point of solution (°C): "))
-            solvent = input("Enter solvent name or formula (e.g., water, H2O): ")
             
-            # Ask if user wants to provide K_f or use a lookup
-            use_lookup = input("Use known freezing point constant? (y/n): ").lower() == 'y'
-            K_f = None
-            if use_lookup:
-                print("\nAvailable solvents with known constants:")
-                for i, (solvent_name, constant) in enumerate(FREEZING_POINT_CONSTANTS.items(), 1):
-                    print(f"  [{i}] {solvent_name} (K_f = {constant} °C/m)")
-                
-                choice = input("\nSelect a solvent (number) or press Enter to use input name: ")
-                if choice.strip():
-                    idx = int(choice) - 1
-                    if 0 <= idx < len(FREEZING_POINT_CONSTANTS):
-                        solvent = list(FREEZING_POINT_CONSTANTS.keys())[idx]
-                        K_f = list(FREEZING_POINT_CONSTANTS.values())[idx]
+            if T_solution >= T_pure:
+                print("⚠️  Warning: Solution freezing point should be lower than pure solvent.")
             
-            if K_f is None:
-                K_f_input = input(f"Enter the freezing point constant K_f for {solvent} (°C/m) [leave blank to use lookup]: ")
-                if K_f_input.strip():
-                    K_f = float(K_f_input)
+            # Get solvent information
+            solvent, K_f = self._get_solvent_info(FREEZING_POINT_CONSTANTS, "Kf")
             
+            # Get mass data
             solute_mass = float(input("Enter mass of solute (g): "))
             solvent_mass = float(input("Enter mass of solvent (g): "))
             
-            # Ask for van't Hoff factor if needed
-            ionization = input("Is the solute an electrolyte? (y/n): ").lower() == 'y'
-            ionization_factor = 1
-            if ionization:
-                ionization_factor = float(input("Enter van't Hoff factor (i): "))
+            # Get ionization factor
+            ionization_factor = self._get_ionization_factor()
             
             # Solve the problem
             result = solve_freezing_point_problem(
@@ -106,60 +170,39 @@ class ColligativePropertiesUI:
                 ionization_factor=ionization_factor
             )
             
-            display_results_header()
-            if result['success']:
-                print(f"Freezing Point Depression (ΔT): {result['delta_T']:.4f} °C")
-                print(f"Molality: {result['molality']:.6f} mol/kg")
-                print(f"Moles of Solute: {result['moles_solute']:.6f} mol")
-                print(f"Molecular Weight: {result['molecular_weight']:.2f} g/mol")
+            self._display_result_summary(result, "freezing point depression")
                 
-                # Display calculation steps
-                display_steps(result['steps'])
-            else:
-                print(f"Error: {result['error']}")
-                
+        except ValueError as e:
+            print(f"❌ Input Error: Please enter valid numerical values. ({str(e)})")
         except Exception as e:
-            print(f"Error: {str(e)}")
+            print(f"❌ Error: {str(e)}")
     
     def _handle_boiling_point_elevation(self):
         """Handle boiling point elevation calculations."""
-        print("\n===== BOILING POINT ELEVATION CALCULATOR =====")
-        print("\nThis calculator determines molecular weight from boiling point elevation.")
+        print("\n" + "="*70)
+        print("BOILING POINT ELEVATION CALCULATOR")
+        print("="*70)
+        print("This calculator determines molecular weight from boiling point elevation.")
+        print("Formula: ΔTb = Kb × m × i")
+        print()
         
         try:
-            # Get input parameters
+            # Get temperature data
             T_pure = float(input("Enter boiling point of pure solvent (°C): "))
             T_solution = float(input("Enter boiling point of solution (°C): "))
-            solvent = input("Enter solvent name or formula (e.g., water, H2O): ")
             
-            # Ask if user wants to provide K_b or use a lookup
-            use_lookup = input("Use known boiling point constant? (y/n): ").lower() == 'y'
-            K_b = None
-            if use_lookup:
-                print("\nAvailable solvents with known constants:")
-                for i, (solvent_name, constant) in enumerate(BOILING_POINT_CONSTANTS.items(), 1):
-                    print(f"  [{i}] {solvent_name} (K_b = {constant} °C/m)")
-                
-                choice = input("\nSelect a solvent (number) or press Enter to use input name: ")
-                if choice.strip():
-                    idx = int(choice) - 1
-                    if 0 <= idx < len(BOILING_POINT_CONSTANTS):
-                        solvent = list(BOILING_POINT_CONSTANTS.keys())[idx]
-                        K_b = list(BOILING_POINT_CONSTANTS.values())[idx]
+            if T_solution <= T_pure:
+                print("⚠️  Warning: Solution boiling point should be higher than pure solvent.")
             
-            if K_b is None:
-                K_b_input = input(f"Enter the boiling point constant K_b for {solvent} (°C/m) [leave blank to use lookup]: ")
-                if K_b_input.strip():
-                    K_b = float(K_b_input)
+            # Get solvent information
+            solvent, K_b = self._get_solvent_info(BOILING_POINT_CONSTANTS, "Kb")
             
+            # Get mass data
             solute_mass = float(input("Enter mass of solute (g): "))
             solvent_mass = float(input("Enter mass of solvent (g): "))
             
-            # Ask for van't Hoff factor if needed
-            ionization = input("Is the solute an electrolyte? (y/n): ").lower() == 'y'
-            ionization_factor = 1
-            if ionization:
-                ionization_factor = float(input("Enter van't Hoff factor (i): "))
+            # Get ionization factor
+            ionization_factor = self._get_ionization_factor()
             
             # Solve the problem
             result = solve_boiling_point_problem(
@@ -172,38 +215,40 @@ class ColligativePropertiesUI:
                 ionization_factor=ionization_factor
             )
             
-            display_results_header()
-            if result['success']:
-                print(f"Boiling Point Elevation (ΔT): {result['delta_T']:.4f} °C")
-                print(f"Molality: {result['molality']:.6f} mol/kg")
-                print(f"Moles of Solute: {result['moles_solute']:.6f} mol")
-                print(f"Molecular Weight: {result['molecular_weight']:.2f} g/mol")
+            self._display_result_summary(result, "boiling point elevation")
                 
-                # Display calculation steps
-                display_steps(result['steps'])
-            else:
-                print(f"Error: {result['error']}")
-                
+        except ValueError as e:
+            print(f"❌ Input Error: Please enter valid numerical values. ({str(e)})")
         except Exception as e:
-            print(f"Error: {str(e)}")
+            print(f"❌ Error: {str(e)}")
     
     def _handle_osmotic_pressure(self):
         """Handle osmotic pressure calculations."""
-        print("\n===== OSMOTIC PRESSURE CALCULATOR =====")
-        print("\nThis calculator determines molecular weight from osmotic pressure.")
+        print("\n" + "="*70)
+        print("OSMOTIC PRESSURE CALCULATOR")
+        print("="*70)
+        print("This calculator determines molecular weight from osmotic pressure.")
+        print("Formula: π = iMRT (where M = molarity)")
+        print()
         
         try:
-            # Get input parameters
-            osmotic_pressure_atm = float(input("Enter osmotic pressure (atm): "))
+            # Get pressure and temperature data
+            pressure_input = input("Enter osmotic pressure (atm) or (torr): ").strip()
+            
+            # Handle different pressure units
+            if 'torr' in pressure_input.lower():
+                pressure_torr = float(pressure_input.replace('torr', '').strip())
+                osmotic_pressure_atm = pressure_torr / 760  # Convert torr to atm
+                print(f"Converted: {pressure_torr} torr = {osmotic_pressure_atm:.6f} atm")
+            else:
+                osmotic_pressure_atm = float(pressure_input.replace('atm', '').strip())
+            
             temperature_c = float(input("Enter temperature (°C): "))
             solution_volume_L = float(input("Enter solution volume (L): "))
             solute_mass = float(input("Enter mass of solute (g): "))
             
-            # Ask for van't Hoff factor if needed
-            ionization = input("Is the solute an electrolyte? (y/n): ").lower() == 'y'
-            ionization_factor = 1
-            if ionization:
-                ionization_factor = float(input("Enter van't Hoff factor (i): "))
+            # Get ionization factor
+            ionization_factor = self._get_ionization_factor()
             
             # Solve the problem
             result = solve_osmotic_pressure_problem(
@@ -214,31 +259,38 @@ class ColligativePropertiesUI:
                 ionization_factor=ionization_factor
             )
             
-            display_results_header()
-            if result['success']:
-                print(f"Moles of Solute: {result['moles_solute']:.6f} mol")
-                print(f"Molecular Weight: {result['molecular_weight']:.2f} g/mol")
+            self._display_result_summary(result, "osmotic pressure")
                 
-                # Display calculation steps
-                display_steps(result['steps'])
-            else:
-                print(f"Error: {result['error']}")
-                
+        except ValueError as e:
+            print(f"❌ Input Error: Please enter valid numerical values. ({str(e)})")
         except Exception as e:
-            print(f"Error: {str(e)}")
+            print(f"❌ Error: {str(e)}")
     
     def _handle_vapor_pressure_lowering(self):
         """Handle vapor pressure lowering calculations."""
-        print("\n===== VAPOR PRESSURE LOWERING CALCULATOR =====")
-        print("\nThis calculator determines molecular weight from vapor pressure lowering.")
+        print("\n" + "="*70)
+        print("VAPOR PRESSURE LOWERING CALCULATOR")
+        print("="*70)
+        print("This calculator determines molecular weight from vapor pressure lowering.")
+        print("Formula: P_solution = P_pure × (1 - X_solute) [Raoult's Law]")
+        print("Note: This method assumes ideal solution behavior.")
+        print()
         
         try:
-            # Get input parameters
+            # Get pressure data
             P_pure = float(input("Enter vapor pressure of pure solvent: "))
             P_solution = float(input("Enter vapor pressure of solution: "))
+            
+            if P_solution >= P_pure:
+                print("⚠️  Warning: Solution vapor pressure should be lower than pure solvent.")
+            
+            # Get mass data
             solute_mass = float(input("Enter mass of solute (g): "))
-            solvent = input("Enter solvent name or formula (e.g., water, H2O): ")
+            solvent = input("Enter solvent name or formula (e.g., water, H2O): ").strip()
             solvent_mass = float(input("Enter mass of solvent (g): "))
+            
+            # Note about electrolytes
+            print("\n📝 Note: Vapor pressure lowering calculations assume non-volatile, non-electrolyte solutes.")
             
             # Solve the problem
             result = solve_vapor_pressure_problem(
@@ -249,38 +301,62 @@ class ColligativePropertiesUI:
                 solvent_mass=solvent_mass
             )
             
-            display_results_header()
-            if result['success']:
-                print(f"Vapor Pressure Lowering (ΔP): {result['delta_P']:.4f}")
-                print(f"Mole Fraction of Solute: {result['mole_fraction_solute']:.6f}")
-                print(f"Moles of Solvent: {result['moles_solvent']:.6f} mol")
-                print(f"Moles of Solute: {result['moles_solute']:.6f} mol")
-                print(f"Molecular Weight: {result['molecular_weight']:.2f} g/mol")
+            self._display_result_summary(result, "vapor pressure lowering")
                 
-                # Display calculation steps
-                display_steps(result['steps'])
-            else:
-                print(f"Error: {result['error']}")
-                
+        except ValueError as e:
+            print(f"❌ Input Error: Please enter valid numerical values. ({str(e)})")
         except Exception as e:
-            print(f"Error: {str(e)}")
+            print(f"❌ Error: {str(e)}")
     
     def _display_constants(self):
         """Display available constants for different solvents."""
-        print("\n===== COLLIGATIVE PROPERTY CONSTANTS =====")
+        print("\n" + "="*80)
+        print("COLLIGATIVE PROPERTY CONSTANTS DATABASE")
+        print("="*80)
         
         # Display Freezing Point Depression Constants
-        print("\nFreezing Point Depression Constants (K_f):")
-        print("-" * 50)
-        print(f"{'Solvent':<20} {'K_f (°C/m)':<15}")
-        print("-" * 50)
+        print("\n🧊 FREEZING POINT DEPRESSION CONSTANTS (Kf)")
+        print("-" * 60)
+        print(f"{'Solvent':<20} {'Kf (°C/m)':<15} {'Normal F.P. (°C)':<20}")
+        print("-" * 60)
+        
+        # Add normal freezing points for context
+        normal_fp = {
+            "water": 0.0,
+            "benzene": 5.5,
+            "cyclohexane": 6.6,
+            "camphor": 179.8,
+            "acetic_acid": 16.6,
+            "naphthalene": 80.2
+        }
+        
         for solvent, constant in FREEZING_POINT_CONSTANTS.items():
-            print(f"{solvent:<20} {constant:<15.3f}")
+            fp = normal_fp.get(solvent, "N/A")
+            fp_str = f"{fp}" if isinstance(fp, str) else f"{fp:.1f}"
+            print(f"{solvent.title():<20} {constant:<15.3f} {fp_str:<20}")
         
         # Display Boiling Point Elevation Constants
-        print("\nBoiling Point Elevation Constants (K_b):")
-        print("-" * 50)
-        print(f"{'Solvent':<20} {'K_b (°C/m)':<15}")
-        print("-" * 50)
+        print("\n🔥 BOILING POINT ELEVATION CONSTANTS (Kb)")
+        print("-" * 60)
+        print(f"{'Solvent':<20} {'Kb (°C/m)':<15} {'Normal B.P. (°C)':<20}")
+        print("-" * 60)
+        
+        # Add normal boiling points for context
+        normal_bp = {
+            "water": 100.0,
+            "benzene": 80.1,
+            "chloroform": 61.2,
+            "ethanol": 78.4,
+            "acetic_acid": 118.1
+        }
+        
         for solvent, constant in BOILING_POINT_CONSTANTS.items():
-            print(f"{solvent:<20} {constant:<15.3f}")
+            bp = normal_bp.get(solvent, "N/A")
+            bp_str = f"{bp}" if isinstance(bp, str) else f"{bp:.1f}"
+            print(f"{solvent.title():<20} {constant:<15.3f} {bp_str:<20}")
+        
+        print(f"\n📚 Usage Notes:")
+        print(f"• Kf and Kb values are specific to each solvent")
+        print(f"• These constants are used in the equations: ΔTf = Kf×m×i and ΔTb = Kb×m×i")
+        print(f"• m = molality (mol solute/kg solvent), i = van't Hoff factor")
+        print(f"• For precise work, always verify constants from reliable sources")

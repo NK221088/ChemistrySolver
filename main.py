@@ -17,7 +17,8 @@ from ui.colligative_properties_ui import ColligativePropertiesUI
 from ui.insoluble_salts_ui import InsolubleSaltsUI
 from ui.oxidation_state_ui import OxidationStateUI
 from ui.redox_ui import RedoxUI
-from ui.gas_concentration_ui import GasConcentrationUI  # Import the new gas concentration UI module
+from ui.gas_concentration_ui import GasConcentrationUI
+from ui.ionic_character_ui import IonicCharacterUI
 
 def main():
     """Main application entry point."""
@@ -92,6 +93,10 @@ def main():
             # Launch Gas Concentration Calculator module
             gas_concentration_ui = GasConcentrationUI()
             gas_concentration_ui.run()
+        elif choice == "15":
+            # Launch Ionic Character Calculator module
+            ionic_character_ui = IonicCharacterUI()
+            ionic_character_ui.run()
         # Add more modules as needed
         else:
             print("Invalid choice. Please try again.")

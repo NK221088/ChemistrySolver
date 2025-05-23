@@ -30,7 +30,8 @@ def display_main_menu():
     print("  [11] Insoluble Salts & Qualitative Analysis")
     print("  [12] Oxidation State Calculator")
     print("  [13] Redox Reactions Analyzer")
-    print("  [14] Gas Concentration Calculator")  # Added the new gas concentration module
+    print("  [14] Gas Concentration Calculator")
+    print("  [15] Ionic Character Calculator")
     print("  [0] Exit")
 
 def get_user_choice():

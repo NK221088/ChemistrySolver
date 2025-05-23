@@ -1,11 +1,12 @@
 """
-Colligative Properties Module
+Enhanced Colligative Properties Module
 
 This module includes functions to calculate various colligative properties:
-1. Freezing point depression
-2. Boiling point elevation 
+1. Freezing point depression (calculate MW from data OR compare solutions)
+2. Boiling point elevation (calculate MW from data OR compare solutions)
 3. Osmotic pressure
 4. Vapor pressure lowering
+5. Solution comparison utilities
 
 It integrates with the existing molar mass calculation functionality.
 """
@@ -32,6 +33,188 @@ BOILING_POINT_CONSTANTS = {
     "acetic_acid": 3.07
 }
 
+def calculate_freezing_point_depression_from_molality(molality, K_f=1.86, ionization_factor=1):
+    """
+    Calculate freezing point depression from molality.
+    
+    Parameters:
+    -----------
+    molality : float
+        Molality of the solution (mol/kg)
+    K_f : float, optional
+        Freezing point depression constant in °C/m (default for water: 1.86)
+    ionization_factor : float, optional
+        van 't Hoff factor (default is 1 for non-electrolytes)
+    
+    Returns:
+    --------
+    float
+        Freezing point depression in °C
+    """
+    return K_f * molality * ionization_factor
+
+def calculate_boiling_point_elevation_from_molality(molality, K_b=0.512, ionization_factor=1):
+    """
+    Calculate boiling point elevation from molality.
+    
+    Parameters:
+    -----------
+    molality : float
+        Molality of the solution (mol/kg)
+    K_b : float, optional
+        Boiling point elevation constant in °C/m (default for water: 0.512)
+    ionization_factor : float, optional
+        van 't Hoff factor (default is 1 for non-electrolytes)
+    
+    Returns:
+    --------
+    float
+        Boiling point elevation in °C
+    """
+    return K_b * molality * ionization_factor
+
+def compare_solution_properties(solutions, property_type="freezing_point_depression", solvent="water"):
+    """
+    Compare colligative properties of multiple solutions.
+    
+    Parameters:
+    -----------
+    solutions : list of dict
+        List of solution dictionaries with keys: 'molality', 'name' (optional), 'ionization_factor' (optional)
+    property_type : str
+        Type of property to compare: "freezing_point_depression", "boiling_point_elevation"
+    solvent : str
+        Solvent name for looking up constants
+    
+    Returns:
+    --------
+    dict
+        Comparison results with rankings and values
+    """
+    results = []
+    
+    # Get the appropriate constant
+    if property_type == "freezing_point_depression":
+        constant = FREEZING_POINT_CONSTANTS.get(solvent.lower(), 1.86)
+        calc_func = calculate_freezing_point_depression_from_molality
+    elif property_type == "boiling_point_elevation":
+        constant = BOILING_POINT_CONSTANTS.get(solvent.lower(), 0.512)
+        calc_func = calculate_boiling_point_elevation_from_molality
+    else:
+        return {'success': False, 'error': f"Unsupported property type: {property_type}"}
+    
+    # Calculate property for each solution
+    for i, solution in enumerate(solutions):
+        molality = solution['molality']
+        ionization_factor = solution.get('ionization_factor', 1)
+        name = solution.get('name', f"Solution {i+1}")
+        
+        property_value = calc_func(molality, constant, ionization_factor)
+        
+        results.append({
+            'name': name,
+            'molality': molality,
+            'ionization_factor': ionization_factor,
+            'property_value': property_value
+        })
+    
+    # Sort by property value (descending for highest effect)
+    results.sort(key=lambda x: x['property_value'], reverse=True)
+    
+    # Add rankings
+    for i, result in enumerate(results):
+        result['rank'] = i + 1
+    
+    return {
+        'success': True,
+        'property_type': property_type,
+        'solvent': solvent,
+        'constant': constant,
+        'results': results,
+        'highest': results[0] if results else None
+    }
+
+def solve_multiple_choice_colligative_problem(molalities, property_type="freezing_point_depression", 
+                                            solvent="water", ionization_factors=None):
+    """
+    Solve multiple choice problems comparing colligative properties.
+    
+    Parameters:
+    -----------
+    molalities : list of float
+        List of molalities to compare
+    property_type : str
+        Type of property: "freezing_point_depression" or "boiling_point_elevation"
+    solvent : str
+        Solvent name
+    ionization_factors : list of float, optional
+        van 't Hoff factors for each solution (default all 1)
+    
+    Returns:
+    --------
+    dict
+        Results with detailed comparison and answer
+    """
+    if ionization_factors is None:
+        ionization_factors = [1] * len(molalities)
+    
+    if len(ionization_factors) != len(molalities):
+        return {'success': False, 'error': "Number of ionization factors must match number of molalities"}
+    
+    # Prepare solutions list
+    solutions = []
+    for i, (molality, i_factor) in enumerate(zip(molalities, ionization_factors)):
+        solutions.append({
+            'name': f"{molality} m solution",
+            'molality': molality,
+            'ionization_factor': i_factor
+        })
+    
+    # Compare solutions
+    comparison = compare_solution_properties(solutions, property_type, solvent)
+    
+    if not comparison['success']:
+        return comparison
+    
+    # Generate detailed explanation
+    steps = []
+    steps.append(f"Comparing {property_type.replace('_', ' ')} for different solutions:")
+    steps.append(f"Solvent: {solvent} (K = {comparison['constant']} °C/m)")
+    steps.append("")
+    
+    if property_type == "freezing_point_depression":
+        steps.append("Formula: ΔTf = Kf × m × i")
+        unit = "°C"
+        explanation = "Higher ΔTf means greater freezing point depression"
+    else:
+        steps.append("Formula: ΔTb = Kb × m × i")
+        unit = "°C"
+        explanation = "Higher ΔTb means greater boiling point elevation"
+    
+    steps.append("")
+    steps.append("Calculations:")
+    
+    for result in comparison['results']:
+        calc_detail = f"{comparison['constant']} × {result['molality']} × {result['ionization_factor']} = {result['property_value']:.3f} {unit}"
+        steps.append(f"  {result['name']}: {calc_detail}")
+    
+    steps.append("")
+    steps.append("Ranking (highest to lowest):")
+    for result in comparison['results']:
+        steps.append(f"  {result['rank']}. {result['name']}: {result['property_value']:.3f} {unit}")
+    
+    steps.append("")
+    steps.append(f"Answer: {comparison['highest']['name']} has the highest {property_type.replace('_', ' ')}")
+    steps.append(explanation)
+    
+    return {
+        'success': True,
+        'comparison': comparison,
+        'answer': comparison['highest'],
+        'steps': steps
+    }
+
+# Original functions (keeping for backward compatibility)
 def calculate_freezing_point_depression(T_pure, T_solution, K_f, solute_mass, solvent, solvent_mass, ionization_factor=1):
     """
     Calculate molecular weight based on freezing point depression.
@@ -341,6 +524,7 @@ def calculate_vapor_pressure_lowering(P_pure, P_solution, solute_mass, solvent, 
         'steps': steps
     }
 
+# Wrapper functions for backward compatibility and convenience
 def solve_freezing_point_problem(T_pure, T_solution, solvent, K_f=None, solute_mass=1, solvent_mass=None, ionization_factor=1):
     """
     Solve a freezing point depression problem.
@@ -480,3 +664,22 @@ def solve_vapor_pressure_problem(P_pure, P_solution, solute_mass, solvent, solve
     return calculate_vapor_pressure_lowering(
         P_pure, P_solution, solute_mass, solvent, solvent_mass
     )
+
+# Example usage for the specific question type:
+if __name__ == "__main__":
+    # Example: Solve the antifreeze problem from the question
+    molalities = [2.6, 3.3, 1.1, 5.7, 4.4]
+    
+    result = solve_multiple_choice_colligative_problem(
+        molalities=molalities,
+        property_type="freezing_point_depression",
+        solvent="water"
+    )
+    
+    if result['success']:
+        print("=== FREEZING POINT DEPRESSION COMPARISON ===")
+        for step in result['steps']:
+            print(step)
+        print(f"\nFinal Answer: {result['answer']['name']}")
+    else:
+        print(f"Error: {result['error']}")

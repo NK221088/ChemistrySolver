@@ -1,10 +1,12 @@
 """
-Refactored Colligative Properties Calculator
+Enhanced Colligative Properties Calculator
 
 This module provides functions to solve colligative property problems:
 1. Calculate molecular weight from colligative property data
 2. Compare solutions based on colligative properties
 3. Calculate colligative property values from concentration data
+4. Calculate molality and freezing/boiling points from mass data
+5. Solve forward and reverse colligative property problems
 
 Supports: freezing point depression, boiling point elevation, osmotic pressure, vapor pressure lowering
 """
@@ -68,6 +70,202 @@ class ColligativePropertyCalculator:
         else:
             raise ValueError(f"Unsupported property type: {property_type}")
     
+    def calculate_molality_and_freezing_point(self, solute_mass, solute_molar_mass, 
+                                            solvent_mass, ionization_factor=1, 
+                                            answer_choices=None):
+        """
+        Calculate molality and new freezing point from mass and molar mass data.
+        
+        Parameters:
+        -----------
+        solute_mass : float
+            Mass of solute (g)
+        solute_molar_mass : float
+            Molar mass of solute (g/mol)
+        solvent_mass : float
+            Mass of solvent (g)
+        ionization_factor : float
+            van 't Hoff factor (default: 1)
+        answer_choices : list, optional
+            Multiple choice options as tuples (molality, freezing_point)
+        
+        Returns:
+        --------
+        dict
+            Results with molality, freezing point depression, and new freezing point
+        """
+        # Convert solvent mass to kg
+        solvent_mass_kg = solvent_mass / GRAMS_TO_KG
+        
+        # Calculate moles of solute
+        moles_solute = solute_mass / solute_molar_mass
+        
+        # Calculate molality
+        molality = moles_solute / solvent_mass_kg
+        
+        # Calculate freezing point depression
+        Kf = self.constants["Kf"]
+        normal_fp = self.constants.get("freezing_point", 0.0)  # Normal freezing point
+        freezing_point_depression = Kf * molality * ionization_factor
+        
+        # Calculate new freezing point
+        new_freezing_point = normal_fp - freezing_point_depression
+        
+        steps = [
+            f"Molality and Freezing Point Calculation:",
+            f"Given: Mass of solute = {solute_mass} g",
+            f"       Molar mass of solute = {solute_molar_mass} g/mol",
+            f"       Mass of solvent ({self.solvent}) = {solvent_mass} g",
+            f"       Kf = {Kf}°C/m, i = {ionization_factor}",
+            f"",
+            f"Step 1: Calculate moles of solute",
+            f"moles = mass / molar_mass = {solute_mass} / {solute_molar_mass} = {moles_solute:.6f} mol",
+            f"",
+            f"Step 2: Calculate molality",
+            f"molality = moles / kg_solvent = {moles_solute:.6f} / {solvent_mass_kg} = {molality:.4f} mol/kg",
+            f"",
+            f"Step 3: Calculate freezing point depression",
+            f"ΔTf = Kf × m × i = {Kf} × {molality:.4f} × {ionization_factor} = {freezing_point_depression:.2f}°C",
+            f"",
+            f"Step 4: Calculate new freezing point",
+            f"New FP = Normal FP - ΔTf = {normal_fp}°C - {freezing_point_depression:.2f}°C = {new_freezing_point:.2f}°C"
+        ]
+        
+        result = {
+            'success': True,
+            'moles_solute': moles_solute,
+            'molality': molality,
+            'freezing_point_depression': freezing_point_depression,
+            'new_freezing_point': new_freezing_point,
+            'steps': steps
+        }
+        
+        if answer_choices:
+            # Find closest match for molality and freezing point pair
+            def distance(choice):
+                m_diff = abs(choice[0] - molality)
+                fp_diff = abs(choice[1] - new_freezing_point)
+                return m_diff + fp_diff  # Simple distance metric
+            
+            closest_answer = min(answer_choices, key=distance)
+            m_difference = abs(closest_answer[0] - molality)
+            fp_difference = abs(closest_answer[1] - new_freezing_point)
+            
+            steps.extend([
+                f"",
+                f"Multiple Choice Analysis:",
+                f"Answer choices (molality, freezing point): {answer_choices}",
+                f"Calculated: ({molality:.2f} m, {new_freezing_point:.1f}°C)",
+                f"Closest match: ({closest_answer[0]} m, {closest_answer[1]}°C)",
+                f"Differences: molality = {m_difference:.3f}, freezing point = {fp_difference:.1f}°C"
+            ])
+            
+            result.update({
+                'closest_answer': closest_answer,
+                'molality_difference': m_difference,
+                'freezing_point_difference': fp_difference
+            })
+        
+        return result
+    
+    def calculate_molality_and_boiling_point(self, solute_mass, solute_molar_mass, 
+                                           solvent_mass, ionization_factor=1, 
+                                           answer_choices=None):
+        """
+        Calculate molality and new boiling point from mass and molar mass data.
+        
+        Parameters:
+        -----------
+        solute_mass : float
+            Mass of solute (g)
+        solute_molar_mass : float
+            Molar mass of solute (g/mol)
+        solvent_mass : float
+            Mass of solvent (g)
+        ionization_factor : float
+            van 't Hoff factor (default: 1)
+        answer_choices : list, optional
+            Multiple choice options as tuples (molality, boiling_point)
+        
+        Returns:
+        --------
+        dict
+            Results with molality, boiling point elevation, and new boiling point
+        """
+        # Convert solvent mass to kg
+        solvent_mass_kg = solvent_mass / GRAMS_TO_KG
+        
+        # Calculate moles of solute
+        moles_solute = solute_mass / solute_molar_mass
+        
+        # Calculate molality
+        molality = moles_solute / solvent_mass_kg
+        
+        # Calculate boiling point elevation
+        Kb = self.constants["Kb"]
+        normal_bp = self.constants.get("boiling_point", 100.0)  # Normal boiling point
+        boiling_point_elevation = Kb * molality * ionization_factor
+        
+        # Calculate new boiling point
+        new_boiling_point = normal_bp + boiling_point_elevation
+        
+        steps = [
+            f"Molality and Boiling Point Calculation:",
+            f"Given: Mass of solute = {solute_mass} g",
+            f"       Molar mass of solute = {solute_molar_mass} g/mol",
+            f"       Mass of solvent ({self.solvent}) = {solvent_mass} g",
+            f"       Kb = {Kb}°C/m, i = {ionization_factor}",
+            f"",
+            f"Step 1: Calculate moles of solute",
+            f"moles = mass / molar_mass = {solute_mass} / {solute_molar_mass} = {moles_solute:.6f} mol",
+            f"",
+            f"Step 2: Calculate molality",
+            f"molality = moles / kg_solvent = {moles_solute:.6f} / {solvent_mass_kg} = {molality:.4f} mol/kg",
+            f"",
+            f"Step 3: Calculate boiling point elevation",
+            f"ΔTb = Kb × m × i = {Kb} × {molality:.4f} × {ionization_factor} = {boiling_point_elevation:.2f}°C",
+            f"",
+            f"Step 4: Calculate new boiling point",
+            f"New BP = Normal BP + ΔTb = {normal_bp}°C + {boiling_point_elevation:.2f}°C = {new_boiling_point:.2f}°C"
+        ]
+        
+        result = {
+            'success': True,
+            'moles_solute': moles_solute,
+            'molality': molality,
+            'boiling_point_elevation': boiling_point_elevation,
+            'new_boiling_point': new_boiling_point,
+            'steps': steps
+        }
+        
+        if answer_choices:
+            # Find closest match for molality and boiling point pair
+            def distance(choice):
+                m_diff = abs(choice[0] - molality)
+                bp_diff = abs(choice[1] - new_boiling_point)
+                return m_diff + bp_diff  # Simple distance metric
+            
+            closest_answer = min(answer_choices, key=distance)
+            m_difference = abs(closest_answer[0] - molality)
+            bp_difference = abs(closest_answer[1] - new_boiling_point)
+            
+            steps.extend([
+                f"",
+                f"Multiple Choice Analysis:",
+                f"Answer choices (molality, boiling point): {answer_choices}",
+                f"Calculated: ({molality:.2f} m, {new_boiling_point:.1f}°C)",
+                f"Closest match: ({closest_answer[0]} m, {closest_answer[1]}°C)",
+                f"Differences: molality = {m_difference:.3f}, boiling point = {bp_difference:.1f}°C"
+            ])
+            
+            result.update({
+                'closest_answer': closest_answer,
+                'molality_difference': m_difference,
+                'boiling_point_difference': bp_difference
+            })
+        
+        return result
+
     def calculate_molecular_weight(self, method, delta_T, solute_mass, solvent_mass, 
                                  ionization_factor=1, answer_choices=None, **kwargs):
         """
@@ -385,6 +583,66 @@ def calculate_molecular_weight(method, solvent="water", **kwargs):
     calculator = ColligativePropertyCalculator(solvent)
     return calculator.calculate_molecular_weight(method, **kwargs)
 
+def calculate_molality_and_freezing_point(solute_mass, solute_molar_mass, solvent_mass, 
+                                        solvent="water", ionization_factor=1, answer_choices=None):
+    """
+    Calculate molality and new freezing point from mass data.
+    
+    Parameters:
+    -----------
+    solute_mass : float
+        Mass of solute (g)
+    solute_molar_mass : float
+        Molar mass of solute (g/mol)
+    solvent_mass : float
+        Mass of solvent (g)
+    solvent : str
+        Solvent name (default: "water")
+    ionization_factor : float
+        van 't Hoff factor (default: 1)
+    answer_choices : list, optional
+        Multiple choice options as tuples (molality, freezing_point)
+    
+    Returns:
+    --------
+    dict
+        Results with molality and freezing point
+    """
+    calculator = ColligativePropertyCalculator(solvent)
+    return calculator.calculate_molality_and_freezing_point(
+        solute_mass, solute_molar_mass, solvent_mass, ionization_factor, answer_choices
+    )
+
+def calculate_molality_and_boiling_point(solute_mass, solute_molar_mass, solvent_mass, 
+                                       solvent="water", ionization_factor=1, answer_choices=None):
+    """
+    Calculate molality and new boiling point from mass data.
+    
+    Parameters:
+    -----------
+    solute_mass : float
+        Mass of solute (g)
+    solute_molar_mass : float
+        Molar mass of solute (g/mol)
+    solvent_mass : float
+        Mass of solvent (g)
+    solvent : str
+        Solvent name (default: "water")
+    ionization_factor : float
+        van 't Hoff factor (default: 1)
+    answer_choices : list, optional
+        Multiple choice options as tuples (molality, boiling_point)
+    
+    Returns:
+    --------
+    dict
+        Results with molality and boiling point
+    """
+    calculator = ColligativePropertyCalculator(solvent)
+    return calculator.calculate_molality_and_boiling_point(
+        solute_mass, solute_molar_mass, solvent_mass, ionization_factor, answer_choices
+    )
+
 def compare_colligative_properties(solutions, property_type="freezing_point_depression", solvent="water"):
     """
     Compare colligative properties of multiple solutions.
@@ -414,7 +672,7 @@ def solve_multiple_choice_problem(problem_data):
     -----------
     problem_data : dict
         Problem configuration with keys:
-        - 'type': 'molecular_weight' or 'compare_solutions'
+        - 'type': 'molecular_weight', 'compare_solutions', 'molality_freezing_point', 'molality_boiling_point'
         - 'method': calculation method (for molecular weight problems)
         - 'solvent': solvent name (default: "water")
         - Other method-specific parameters
@@ -448,13 +706,63 @@ def solve_multiple_choice_problem(problem_data):
         
         return calculator.compare_solutions(solutions, property_type)
     
+    elif problem_type == 'molality_freezing_point':
+        required_params = ['solute_mass', 'solute_molar_mass', 'solvent_mass']
+        if not all(param in problem_data for param in required_params):
+            return {'success': False, 'error': f'Required parameters: {required_params}'}
+        
+        return calculator.calculate_molality_and_freezing_point(
+            problem_data['solute_mass'],
+            problem_data['solute_molar_mass'],
+            problem_data['solvent_mass'],
+            problem_data.get('ionization_factor', 1),
+            problem_data.get('answer_choices')
+        )
+    
+    elif problem_type == 'molality_boiling_point':
+        required_params = ['solute_mass', 'solute_molar_mass', 'solvent_mass']
+        if not all(param in problem_data for param in required_params):
+            return {'success': False, 'error': f'Required parameters: {required_params}'}
+        
+        return calculator.calculate_molality_and_boiling_point(
+            problem_data['solute_mass'],
+            problem_data['solute_molar_mass'],
+            problem_data['solvent_mass'],
+            problem_data.get('ionization_factor', 1),
+            problem_data.get('answer_choices')
+        )
+    
     else:
         return {'success': False, 'error': f'Unsupported problem type: {problem_type}'}
 
 
 # Example usage
 if __name__ == "__main__":
-    # Example 1: Compare solutions for freezing point depression
+    # Example 1: The cyclohexane problem from your question
+    print("=== CYCLOHEXANE PROBLEM EXAMPLE ===")
+    
+    # Problem: 5.0 g of compound B (MW ~542 g/mol) in 150.0 g cyclohexane
+    # Cyclohexane: normal FP = 6.6°C, Kf = 20°C/molal
+    
+    # First, let's solve it step by step
+    result = calculate_molality_and_freezing_point(
+        solute_mass=5.0,
+        solute_molar_mass=542,
+        solvent_mass=150.0,
+        solvent="cyclohexane",  # You'd need to add cyclohexane to SOLVENT_CONSTANTS
+        answer_choices=[(0.08, 5.6), (0.06, 5.4), (0.04, 5.4), (0.04, 5.6), (0.06, 5.6)]
+    )
+    
+    if result['success']:
+        for step in result['steps']:
+            print(step)
+        print(f"\nFinal Answer: {result['molality']:.2f} m; {result['new_freezing_point']:.1f}°C")
+        if 'closest_answer' in result:
+            print(f"Closest multiple choice: {result['closest_answer'][0]} m; {result['closest_answer'][1]}°C")
+    
+    print("\n" + "="*60 + "\n")
+    
+    # Example 2: Compare solutions for freezing point depression
     print("=== SOLUTION COMPARISON EXAMPLE ===")
     solutions = [
         {'molality': 2.6, 'name': '2.6 m solution'},
@@ -469,9 +777,9 @@ if __name__ == "__main__":
         for step in result['steps']:
             print(step)
     
-    print("\n" + "="*50 + "\n")
+    print("\n" + "="*60 + "\n")
     
-    # Example 2: Calculate molecular weight from freezing point data
+    # Example 3: Calculate molecular weight from freezing point data
     print("=== MOLECULAR WEIGHT CALCULATION EXAMPLE ===")
     mw_result = calculate_molecular_weight(
         method="freezing_point",
@@ -484,4 +792,25 @@ if __name__ == "__main__":
     
     if mw_result['success']:
         for step in mw_result['steps']:
+            print(step)
+    
+    print("\n" + "="*60 + "\n")
+    
+    # Example 4: Using the unified problem solver
+    print("=== UNIFIED PROBLEM SOLVER EXAMPLE ===")
+    
+    # Same cyclohexane problem using the unified interface
+    cyclohexane_problem = {
+        'type': 'molality_freezing_point',
+        'solute_mass': 5.0,
+        'solute_molar_mass': 542,
+        'solvent_mass': 150.0,
+        'solvent': 'cyclohexane',
+        'answer_choices': [(0.08, 5.6), (0.06, 5.4), (0.04, 5.4), (0.04, 5.6), (0.06, 5.6)]
+    }
+    
+    unified_result = solve_multiple_choice_problem(cyclohexane_problem)
+    if unified_result['success']:
+        print("Unified solver result:")
+        for step in unified_result['steps'][-5:]:  # Show last 5 steps
             print(step)

@@ -698,20 +698,16 @@ def calculate_delta_g_from_enthalpy_entropy(delta_h_standard, delta_s_standard, 
 
 
 def solve_equilibrium_constant_problem(
-    delta_h_standard=None,     # kJ/mol
-    delta_s_standard=None,     # J/(mol·K)
     delta_g_standard=None,     # kJ/mol
     temperature_c=None,        # °C
     temperature_k=None,        # K
     reaction_string=None
 ) -> Dict[str, Any]:
     """
-    Solve equilibrium constant problems using thermodynamic data.
+    Calculate equilibrium constant directly from ΔG° using the simple approach.
     
     Parameters:
-        delta_h_standard (float, optional): Standard enthalpy change in kJ/mol
-        delta_s_standard (float, optional): Standard entropy change in J/(mol·K)
-        delta_g_standard (float, optional): Standard Gibbs free energy change in kJ/mol
+        delta_g_standard (float): Standard Gibbs free energy change in kJ/mol
         temperature_c (float, optional): Temperature in Celsius
         temperature_k (float, optional): Temperature in Kelvin
         reaction_string (str, optional): The balanced chemical equation
@@ -719,6 +715,7 @@ def solve_equilibrium_constant_problem(
     Returns:
         Dict[str, Any]: Dictionary containing results and solution steps
     """
+    R = 8.314  # J/(mol·K)
     steps = []
     
     # Handle temperature conversion
@@ -729,50 +726,47 @@ def solve_equilibrium_constant_problem(
         steps.append("")
     elif temperature_c is None and temperature_k is not None:
         temperature_c = temperature_k - 273.15
+    elif temperature_k is None and temperature_c is None:
+        # Default to 25°C if no temperature provided
+        temperature_c = 25.0
+        temperature_k = 298.15
+        steps.append(f"Step 1: Using standard temperature:")
+        steps.append(f"T = 25 °C = 298.15 K")
+        steps.append("")
     
-    if temperature_k is None:
-        raise ValueError("Temperature must be provided in either Celsius or Kelvin")
+    if delta_g_standard is None:
+        raise ValueError("ΔG° must be provided")
     
     # Add reaction information if provided
     if reaction_string:
         steps.append(f"Balanced reaction: {reaction_string}")
         steps.append("")
     
-    # Calculate ΔG° if not provided
-    if delta_g_standard is None:
-        if delta_h_standard is not None and delta_s_standard is not None:
-            delta_g_standard = calculate_delta_g_from_enthalpy_entropy(
-                delta_h_standard, delta_s_standard, temperature_k
-            )
-            
-            step_num = len([s for s in steps if s.startswith("Step")]) + 1
-            steps.append(f"Step {step_num}: Calculate ΔG° using ΔG° = ΔH° - TΔS°:")
-            steps.append(f"ΔG° = {delta_h_standard} kJ/mol - ({temperature_k:.2f} K)({delta_s_standard} J/(mol·K) × 1 kJ/1000 J)")
-            steps.append(f"ΔG° = {delta_h_standard} kJ/mol - ({temperature_k:.2f})({delta_s_standard/1000:.6f} kJ/(mol·K))")
-            steps.append(f"ΔG° = {delta_h_standard} kJ/mol - {temperature_k * delta_s_standard/1000:.3f} kJ/mol")
-            steps.append(f"ΔG° = {delta_g_standard:.3f} kJ/mol")
-            steps.append("")
-        else:
-            raise ValueError("Either ΔG° must be provided, or both ΔH° and ΔS° must be provided")
-    
-    # Calculate equilibrium constant
-    K = calculate_equilibrium_constant(delta_g_standard, temperature_k)
+    # Calculate equilibrium constant using ΔG° = -RT ln(K)
+    # Rearranging: ln(K) = -ΔG°/(RT)
+    # Therefore: K = exp(-ΔG°/(RT))
     
     step_num = len([s for s in steps if s.startswith("Step")]) + 1
-    steps.append(f"Step {step_num}: Calculate the equilibrium constant using ΔG° = -RT ln(K):")
-    steps.append(f"ln(K) = -ΔG°/RT")
-    steps.append(f"ln(K) = -({delta_g_standard:.3f} kJ/mol × 1000 J/kJ) / ({R_IDEAL_GAS['J/(mol·K)']} J/(mol·K) × {temperature_k:.2f} K)")
-    steps.append(f"ln(K) = -{delta_g_standard * 1000:.1f} J/mol / {R_IDEAL_GAS['J/(mol·K)'] * temperature_k:.1f} J/mol")
-    steps.append(f"ln(K) = {-delta_g_standard * 1000 / (R_IDEAL_GAS['J/(mol·K)'] * temperature_k):.6f}")
-    steps.append(f"K = e^({-delta_g_standard * 1000 / (R_IDEAL_GAS['J/(mol·K)'] * temperature_k):.6f})")
+    steps.append(f"Step {step_num}: Calculate equilibrium constant using ΔG° = -RT ln(K)")
+    steps.append(f"Rearranging: ln(K) = -ΔG°/(RT)")
+    steps.append(f"Therefore: K = exp(-ΔG°/(RT))")
+    steps.append("")
+    
+    # Convert ΔG° from kJ/mol to J/mol
+    delta_g_joules = delta_g_standard * 1000
+    
+    steps.append(f"Substituting values:")
+    steps.append(f"K = exp(-({delta_g_standard} kJ/mol × 1000 J/kJ) / ({R} J/(mol·K) × {temperature_k:.2f} K))")
+    steps.append(f"K = exp(-{delta_g_joules} J/mol / {R * temperature_k:.1f} J/mol)")
+    steps.append(f"K = exp({-delta_g_joules / (R * temperature_k):.6f})")
+    
+    K = math.exp(-delta_g_joules / (R * temperature_k))
     steps.append(f"K = {K:.2e}")
     
     return {
         "reaction": reaction_string,
         "temperature_c": temperature_c,
         "temperature_k": temperature_k,
-        "delta_h_standard": delta_h_standard,
-        "delta_s_standard": delta_s_standard,
         "delta_g_standard": delta_g_standard,
         "equilibrium_constant": K,
         "steps": steps
@@ -781,21 +775,19 @@ def solve_equilibrium_constant_problem(
 
 def solve_equilibrium_from_formation_data(
     reaction_coefficients,      # Dict: {'reactants': {'substance': coeff}, 'products': {'substance': coeff}}
-    formation_enthalpies,       # Dict: {'substance': ΔHf° in kJ/mol}
-    standard_entropies,         # Dict: {'substance': S° in J/(mol·K)}
+    formation_free_energies,    # Dict: {'substance': ΔGf° in kJ/mol}
     temperature_c=25,           # Temperature in Celsius
     reaction_string=None        # Optional reaction string for display
 ) -> Dict[str, Any]:
     """
-    Calculate equilibrium constant from standard formation data for any reaction.
+    Calculate equilibrium constant from standard Gibbs free energies of formation.
+    This is the simple approach: ΔG°rxn = Σ(coeff × ΔGf°)products - Σ(coeff × ΔGf°)reactants
     
     Parameters:
         reaction_coefficients (dict): Reaction stoichiometry
             Example: {'reactants': {'N2': 1, 'H2': 3}, 'products': {'NH3': 2}}
-        formation_enthalpies (dict): Standard enthalpies of formation in kJ/mol
-            Example: {'N2': 0, 'H2': 0, 'NH3': -45.9}
-        standard_entropies (dict): Standard entropies in J/(mol·K)
-            Example: {'N2': 191.6, 'H2': 130.7, 'NH3': 192.8}
+        formation_free_energies (dict): Standard Gibbs free energies of formation in kJ/mol
+            Example: {'N2': 0, 'H2': 0, 'NH3': -16.6}
         temperature_c (float): Temperature in Celsius (default 25°C)
         reaction_string (str, optional): Balanced chemical equation for display
         
@@ -803,90 +795,62 @@ def solve_equilibrium_from_formation_data(
         Dict[str, Any]: Dictionary containing results and solution steps
     """
     
-    # Calculate ΔH° for the reaction
-    delta_h_reaction = 0
+    # Calculate ΔG°rxn using formation data
+    delta_g_reaction = 0
+    
+    # Products contribute positively
     for substance, coeff in reaction_coefficients['products'].items():
-        if substance in formation_enthalpies:
-            delta_h_reaction += coeff * formation_enthalpies[substance]
+        if substance in formation_free_energies:
+            delta_g_reaction += coeff * formation_free_energies[substance]
     
+    # Reactants contribute negatively
     for substance, coeff in reaction_coefficients['reactants'].items():
-        if substance in formation_enthalpies:
-            delta_h_reaction -= coeff * formation_enthalpies[substance]
-    
-    # Calculate ΔS° for the reaction
-    delta_s_reaction = 0
-    for substance, coeff in reaction_coefficients['products'].items():
-        if substance in standard_entropies:
-            delta_s_reaction += coeff * standard_entropies[substance]
-    
-    for substance, coeff in reaction_coefficients['reactants'].items():
-        if substance in standard_entropies:
-            delta_s_reaction -= coeff * standard_entropies[substance]
+        if substance in formation_free_energies:
+            delta_g_reaction -= coeff * formation_free_energies[substance]
     
     # Build detailed calculation steps
     detailed_steps = [
-        "Given thermodynamic data:",
-        "Formation enthalpies (ΔHf°):"
+        "Given standard Gibbs free energies of formation (ΔGf°):"
     ]
     
-    for substance, value in formation_enthalpies.items():
+    for substance, value in formation_free_energies.items():
         detailed_steps.append(f"  {substance}: {value} kJ/mol")
     
     detailed_steps.extend([
         "",
-        "Standard entropies (S°):"
+        "Step 1: Calculate ΔG°rxn using:",
+        "ΔG°rxn = Σ(coefficients × ΔGf°)products - Σ(coefficients × ΔGf°)reactants"
     ])
     
-    for substance, value in standard_entropies.items():
-        detailed_steps.append(f"  {substance}: {value} J/(mol·K)")
-    
-    detailed_steps.extend([
-        "",
-        "Step 1: Calculate ΔH° for the reaction:",
-        "ΔH°rxn = Σ(coefficients × ΔHf°)products - Σ(coefficients × ΔHf°)reactants"
-    ])
-    
-    # Add detailed ΔH° calculation
-    products_h_terms = []
-    reactants_h_terms = []
+    # Add detailed ΔG° calculation
+    products_terms = []
+    reactants_terms = []
     
     for substance, coeff in reaction_coefficients['products'].items():
-        if substance in formation_enthalpies:
-            products_h_terms.append(f"{coeff} × ({formation_enthalpies[substance]})")
+        if substance in formation_free_energies:
+            products_terms.append(f"{coeff} × ({formation_free_energies[substance]})")
     
     for substance, coeff in reaction_coefficients['reactants'].items():
-        if substance in formation_enthalpies:
-            reactants_h_terms.append(f"{coeff} × ({formation_enthalpies[substance]})")
+        if substance in formation_free_energies:
+            reactants_terms.append(f"{coeff} × ({formation_free_energies[substance]})")
     
-    detailed_steps.append(f"ΔH°rxn = [{' + '.join(products_h_terms)}] - [{' + '.join(reactants_h_terms)}]")
-    detailed_steps.append(f"ΔH°rxn = {delta_h_reaction} kJ/mol")
+    detailed_steps.append(f"ΔG°rxn = [{' + '.join(products_terms)}] - [{' + '.join(reactants_terms)}]")
+    
+    # Show the numerical calculation
+    products_sum = sum(coeff * formation_free_energies[substance] 
+                      for substance, coeff in reaction_coefficients['products'].items() 
+                      if substance in formation_free_energies)
+    reactants_sum = sum(coeff * formation_free_energies[substance] 
+                       for substance, coeff in reaction_coefficients['reactants'].items() 
+                       if substance in formation_free_energies)
+    
+    detailed_steps.append(f"ΔG°rxn = {products_sum:.1f} - ({reactants_sum:.1f})")
+    detailed_steps.append(f"ΔG°rxn = {delta_g_reaction:.1f} kJ/mol")
     detailed_steps.append("")
     
-    detailed_steps.extend([
-        "Step 2: Calculate ΔS° for the reaction:",
-        "ΔS°rxn = Σ(coefficients × S°)products - Σ(coefficients × S°)reactants"
-    ])
-    
-    # Add detailed ΔS° calculation
-    products_s_terms = []
-    reactants_s_terms = []
-    
-    for substance, coeff in reaction_coefficients['products'].items():
-        if substance in standard_entropies:
-            products_s_terms.append(f"{coeff} × {standard_entropies[substance]}")
-    
-    for substance, coeff in reaction_coefficients['reactants'].items():
-        if substance in standard_entropies:
-            reactants_s_terms.append(f"{coeff} × {standard_entropies[substance]}")
-    
-    detailed_steps.append(f"ΔS°rxn = [{' + '.join(products_s_terms)}] - [{' + '.join(reactants_s_terms)}]")
-    detailed_steps.append(f"ΔS°rxn = {delta_s_reaction} J/(mol·K)")
-    detailed_steps.append("")
-    
-    # Use the general equilibrium constant function
+    # Use the simplified equilibrium constant function
     result = solve_equilibrium_constant_problem(
-        delta_h_standard=delta_h_reaction,
-        delta_s_standard=delta_s_reaction,
+        delta_g_standard=delta_g_reaction,
         temperature_c=temperature_c,
         reaction_string=reaction_string
     )
@@ -895,8 +859,7 @@ def solve_equilibrium_from_formation_data(
     result["steps"] = detailed_steps + result["steps"]
     
     # Add the input data to the result
-    result["formation_enthalpies"] = formation_enthalpies
-    result["standard_entropies"] = standard_entropies
+    result["formation_free_energies"] = formation_free_energies
     result["reaction_coefficients"] = reaction_coefficients
     
     return result

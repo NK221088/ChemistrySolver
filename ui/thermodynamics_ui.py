@@ -7,7 +7,7 @@ from chemistry_solver.thermodynamics import (calculate_heat, calculate_temperatu
                       handle_heat_transfer_problem, handle_heat_transfer_with_molar_heat, solve_mixture_problem,
                       calculate_boiling_point_with_pressure, calculate_pressure_with_temperature, 
                       calculate_heat_of_vaporization, parse_reaction_string, solve_enthalpy_problem, 
-                      solve_equilibrium_constant_problem, solve_equilibrium_from_formation_data)
+                      solve_equilibrium_constant_problem, solve_equilibrium_from_formation_data, solve_combustion_enthalpy)
 # Import the name_to_formula module
 try:
     from chemistry_solver.name_to_formula import get_formula_from_name
@@ -491,67 +491,45 @@ class ThermodynamicsUI:
             
         else:
             print("Invalid choice.")
-    
+            
     def _handle_equilibrium_constant_calculations(self):
         """
-        Handler function for equilibrium constant calculations.
+        Simplified handler function for equilibrium constant calculations.
         """
         print("\n=== Equilibrium Constant Calculations ===")
         print("Select the type of calculation:")
-        print("[1] Calculate equilibrium constant from ΔH° and ΔS° (or ΔG°)")
-        print("[2] Calculate equilibrium constant from formation data")
+        print("[1] Calculate equilibrium constant from ΔG° directly")
+        print("[2] Calculate equilibrium constant from Gibbs free energies of formation")
         
         choice = input("\nEnter choice (1-2): ").strip()
         
         if choice == "1":
-            print("\n--- Calculate Equilibrium Constant ---")
-            print("You can provide either:")
-            print("- ΔG° directly, OR")
-            print("- Both ΔH° and ΔS° to calculate ΔG°")
+            print("\n--- Calculate Equilibrium Constant from ΔG° ---")
             
             # Get reaction string (optional)
             reaction = input("\nEnter balanced chemical equation (optional): ").strip() or None
             
-            # Get temperature
-            temp_choice = input("Enter temperature in (C)elsius or (K)elvin? ").lower()
-            if temp_choice.startswith('c'):
-                temp_c = float(input("Enter temperature (°C): "))
-                temp_k = None
-            else:
-                temp_k = float(input("Enter temperature (K): "))
-                temp_c = None
+            # Get temperature (optional, defaults to 25°C)
+            temp_input = input("Enter temperature in °C (default=25): ").strip()
+            temp_c = float(temp_input) if temp_input else 25
             
-            # Get thermodynamic data
-            data_choice = input("\nDo you have ΔG° directly? (y/n): ").lower()
-            
-            if data_choice == 'y':
-                delta_g = float(input("Enter ΔG° (kJ/mol): "))
-                delta_h = None
-                delta_s = None
-            else:
-                print("Enter ΔH° and ΔS° to calculate ΔG°:")
-                delta_h = float(input("Enter ΔH° (kJ/mol): "))
-                delta_s = float(input("Enter ΔS° (J/(mol·K)): "))
-                delta_g = None
+            # Get ΔG°
+            delta_g = float(input("Enter ΔG° (kJ/mol): "))
             
             # Solve the problem
             result = solve_equilibrium_constant_problem(
-                delta_h_standard=delta_h,
-                delta_s_standard=delta_s,
                 delta_g_standard=delta_g,
                 temperature_c=temp_c,
-                temperature_k=temp_k,
                 reaction_string=reaction
             )
             
-            display_results_header()
+            print("\n" + "="*50)
             for step in result["steps"]:
                 print(step)
             
             print(f"\n=== FINAL RESULTS ===")
-            print(f"Temperature: {result['temperature_c']:.2f} °C ({result['temperature_k']:.2f} K)")
-            if result['delta_g_standard'] is not None:
-                print(f"ΔG°: {result['delta_g_standard']:.3f} kJ/mol")
+            print(f"Temperature: {result['temperature_c']:.1f} °C ({result['temperature_k']:.1f} K)")
+            print(f"ΔG°: {result['delta_g_standard']:.1f} kJ/mol")
             print(f"Equilibrium constant (K): {result['equilibrium_constant']:.2e}")
             
             # Interpret the result
@@ -564,32 +542,49 @@ class ThermodynamicsUI:
                 
         elif choice == "2":
             print("\n--- Calculate Equilibrium Constant from Formation Data ---")
-            print("This will calculate the equilibrium constant using standard formation enthalpies and entropies.")
+            print("This uses standard Gibbs free energies of formation (ΔGf°).")
             
-            # Get reaction string
-            reaction = input("\nEnter balanced chemical equation: ").strip()
+            # Get reaction string and balance it using the existing balancer
+            reaction = input("\nEnter chemical equation (unbalanced is fine): ").strip()
+            
+            # Try to balance the equation (keep your existing balancing logic)
+            try:
+                from chemistry_solver.balancer import parse_chemical_equation, balance_equation, format_balanced_equation
+                
+                print("\n--- Balancing Equation ---")
+                reactants_parsed, products_parsed = parse_chemical_equation(reaction)
+                balanced_reactants, balanced_products = balance_equation(reactants_parsed, products_parsed)
+                balanced_equation = format_balanced_equation(balanced_reactants, balanced_products)
+                
+                print(f"Balanced equation: {balanced_equation}")
+                
+                # Convert to the format needed for calculations
+                reactants = {formula: coeff for coeff, formula in balanced_reactants}
+                products = {formula: coeff for coeff, formula in balanced_products}
+                
+                print(f"Reactants: {reactants}")
+                print(f"Products: {products}")
+                
+                # Ask user to confirm
+                confirm = input("\nIs this balanced equation correct? (y/n): ").lower()
+                if confirm != 'y':
+                    print("Please re-enter the equation or balance it manually.")
+                    return
+                    
+            except ImportError as e:
+                print(f"Balancer module not found: {e}")
+                print("Please enter reactants and products manually:")
+                reactants, products = self._get_manual_coefficients()
+                balanced_equation = reaction
+            except Exception as e:
+                print(f"Error balancing equation: {e}")
+                print("Please enter reactants and products manually:")
+                reactants, products = self._get_manual_coefficients()
+                balanced_equation = reaction
             
             # Get temperature
-            temp_c = float(input("Enter temperature (°C, default=25): ") or "25")
-            
-            # Parse reactants and products from user input
-            print("\n--- Enter Reactants ---")
-            reactants = {}
-            num_reactants = int(input("How many different reactants? "))
-            
-            for i in range(num_reactants):
-                substance = input(f"Reactant {i+1} name/formula: ").strip()
-                coeff = float(input(f"Coefficient for {substance}: "))
-                reactants[substance] = coeff
-            
-            print("\n--- Enter Products ---")
-            products = {}
-            num_products = int(input("How many different products? "))
-            
-            for i in range(num_products):
-                substance = input(f"Product {i+1} name/formula: ").strip()
-                coeff = float(input(f"Coefficient for {substance}: "))
-                products[substance] = coeff
+            temp_input = input("\nEnter temperature in °C (default=25): ").strip()
+            temp_c = float(temp_input) if temp_input else 25
             
             reaction_coefficients = {
                 'reactants': reactants,
@@ -599,41 +594,79 @@ class ThermodynamicsUI:
             # Get all unique substances
             all_substances = set(reactants.keys()) | set(products.keys())
             
-            print(f"\n--- Enter Formation Enthalpies (ΔHf°) ---")
-            print("Note: Elements in their standard state have ΔHf° = 0")
-            formation_enthalpies = {}
+            # Try to extract ΔGf° data from CSV file first
+            formation_free_energies = {}
             
-            for substance in all_substances:
-                default_hint = " (0 for elements)" if substance in ['H2', 'N2', 'O2', 'F2', 'Cl2', 'Br2', 'I2'] else ""
-                value = input(f"ΔHf° for {substance} (kJ/mol){default_hint}: ")
-                formation_enthalpies[substance] = float(value) if value else 0.0
-            
-            print(f"\n--- Enter Standard Entropies (S°) ---")
-            standard_entropies = {}
-            
-            for substance in all_substances:
-                value = float(input(f"S° for {substance} (J/(mol·K)): "))
-                standard_entropies[substance] = value
+            try:
+                thermo_data = self._extract_thermodynamic_data_from_csv(all_substances)
+                
+                if thermo_data:
+                    print(f"\n--- Thermodynamic Data Found in Database ---")
+                    print("The following ΔGf° data was found in NBS_Tables-Library.csv:")
+                    
+                    found_substances = []
+                    missing_substances = []
+                    
+                    for substance in sorted(all_substances):
+                        if substance in thermo_data and 'delta_f_g' in thermo_data[substance]:
+                            formation_free_energies[substance] = thermo_data[substance]['delta_f_g']
+                            found_substances.append(substance)
+                            print(f"  {substance}: ΔGf° = {thermo_data[substance]['delta_f_g']:.1f} kJ/mol")
+                        else:
+                            missing_substances.append(substance)
+                    
+                    # Handle missing substances manually
+                    if missing_substances:
+                        print(f"\n--- Manual Entry Required ---")
+                        print("The following substances were not found in the database:")
+                        
+                        for substance in missing_substances:
+                            print(f"\nEntering ΔGf° for {substance}:")
+                            hint = ""
+                            if substance in ['H2', 'N2', 'O2', 'F2', 'Cl2', 'Br2', 'I2', 'C(graphite)', 'S(rhombic)']:
+                                hint = " (hint: 0 for elements in standard state)"
+                            
+                            while True:
+                                try:
+                                    value_input = input(f"ΔGf° for {substance} (kJ/mol){hint}: ").strip()
+                                    formation_free_energies[substance] = float(value_input)
+                                    break
+                                except ValueError:
+                                    print("Please enter a valid number.")
+                    
+                    # Ask user to confirm the data
+                    print(f"\n--- Confirm Gibbs Free Energy Data ---")
+                    for substance in sorted(all_substances):
+                        print(f"{substance}: ΔGf° = {formation_free_energies[substance]:.1f} kJ/mol")
+                    
+                    confirm = input("\nIs this thermodynamic data correct? (y/n): ").lower()
+                    if confirm != 'y':
+                        print("Please enter the data manually:")
+                        formation_free_energies = self._get_manual_gibbs_data(all_substances)
+                else:
+                    raise ValueError("No data found in CSV")
+                    
+            except Exception as e:
+                print(f"Could not extract ΔGf° data from CSV file: {e}")
+                print("Please enter Gibbs free energy data manually:")
+                formation_free_energies = self._get_manual_gibbs_data(all_substances)
             
             # Solve the problem
             result = solve_equilibrium_from_formation_data(
                 reaction_coefficients=reaction_coefficients,
-                formation_enthalpies=formation_enthalpies,
-                standard_entropies=standard_entropies,
+                formation_free_energies=formation_free_energies,
                 temperature_c=temp_c,
-                reaction_string=reaction
+                reaction_string=balanced_equation if 'balanced_equation' in locals() else reaction
             )
             
-            display_results_header()
+            print("\n" + "="*50)
             for step in result["steps"]:
                 print(step)
             
             print(f"\n=== FINAL RESULTS ===")
             print(f"Reaction: {result['reaction']}")
-            print(f"Temperature: {result['temperature_c']:.2f} °C ({result['temperature_k']:.2f} K)")
-            print(f"ΔH°rxn: {result['delta_h_standard']:.1f} kJ/mol")
-            print(f"ΔS°rxn: {result['delta_s_standard']:.1f} J/(mol·K)")
-            print(f"ΔG°rxn: {result['delta_g_standard']:.3f} kJ/mol")
+            print(f"Temperature: {result['temperature_c']:.1f} °C ({result['temperature_k']:.1f} K)")
+            print(f"ΔG°rxn: {result['delta_g_standard']:.1f} kJ/mol")
             print(f"Equilibrium constant (K): {result['equilibrium_constant']:.2e}")
             
             # Interpret the result
@@ -643,3 +676,232 @@ class ThermodynamicsUI:
                 print("Since K < 1, the reaction favors reactants at equilibrium.")
             else:
                 print("Since K ≈ 1, reactants and products are present in similar amounts at equilibrium.")
+        
+        else:
+            print("Invalid choice. Please select 1 or 2.")
+    def _extract_thermodynamic_data_from_csv(self, substances):
+        """
+        Extract thermodynamic data from the CSV format for given substances.
+        Returns dict with structure: {formula: {'delta_f_h': value, 's_standard': value, 'delta_f_g': value}}
+        
+        CSV format expected:
+        Substance,ΔfH°_kJ_mol-1,ΔfG°_kJ_mol-1,S°_J_mol-1_K-1
+        """
+        import pandas as pd
+        import os
+        import re
+        
+        csv_file = rf"ui\NBS_Tables-Library.csv"
+        
+        if not os.path.exists(csv_file):
+            raise FileNotFoundError(f"CSV file {csv_file} not found")
+        
+        try:
+            # Read the CSV file with header in first row (default behavior)
+            df = pd.read_csv(csv_file)
+            
+            # Clean up column names by stripping whitespace
+            df.columns = df.columns.str.strip()
+            
+            # Print available columns for debugging
+            print(f"Available columns: {df.columns.tolist()}")
+            
+            # Define column mappings for the new format
+            substance_col = 'Substance'
+            enthalpy_col = '?fH�_kJ_mol-1'  # Formation enthalpy
+            gibbs_col = '?fG�_kJ_mol-1'     # Formation Gibbs free energy
+            entropy_col = 'S�_J_mol-1_K-1'  # Standard entropy
+            
+            # Alternative column names in case of encoding issues
+            alt_enthalpy_cols = ['ΔfH°_kJ_mol-1', 'delta_fH_kJ_mol-1', 'DfH_kJ_mol-1']
+            alt_gibbs_cols = ['ΔfG°_kJ_mol-1', 'delta_fG_kJ_mol-1', 'DfG_kJ_mol-1']
+            alt_entropy_cols = ['S°_J_mol-1_K-1', 'S_J_mol-1_K-1', 'entropy_J_mol-1_K-1']
+            
+            # Find the correct column names if the default ones don't exist
+            if enthalpy_col not in df.columns:
+                for alt_col in alt_enthalpy_cols:
+                    if alt_col in df.columns:
+                        enthalpy_col = alt_col
+                        break
+                else:
+                    # Try to find by partial match
+                    for col in df.columns:
+                        if 'fH' in col or 'enthalpy' in col.lower():
+                            enthalpy_col = col
+                            break
+            
+            if gibbs_col not in df.columns:
+                for alt_col in alt_gibbs_cols:
+                    if alt_col in df.columns:
+                        gibbs_col = alt_col
+                        break
+                else:
+                    # Try to find by partial match
+                    for col in df.columns:
+                        if 'fG' in col or ('gibbs' in col.lower() and 'formation' in col.lower()):
+                            gibbs_col = col
+                            break
+            
+            if entropy_col not in df.columns:
+                for alt_col in alt_entropy_cols:
+                    if alt_col in df.columns:
+                        entropy_col = alt_col
+                        break
+                else:
+                    # Try to find by partial match  
+                    for col in df.columns:
+                        if 'S°' in col or 'entropy' in col.lower() or ('J_mol' in col and 'K' in col):
+                            entropy_col = col
+                            break
+            
+            # Verify we found required columns
+            if substance_col not in df.columns:
+                raise ValueError(f"Substance column '{substance_col}' not found in CSV")
+            
+            # For flexibility, we'll work with whatever columns are available
+            available_data_types = []
+            if enthalpy_col in df.columns:
+                available_data_types.append(f"Enthalpy: '{enthalpy_col}'")
+            if gibbs_col in df.columns:
+                available_data_types.append(f"Gibbs: '{gibbs_col}'")
+            if entropy_col in df.columns:
+                available_data_types.append(f"Entropy: '{entropy_col}'")
+            
+            print(f"Using columns - Substance: '{substance_col}', " + ", ".join(available_data_types))
+            
+            # Clean the dataframe - remove rows where Substance is NaN
+            df_clean = df.dropna(subset=[substance_col])
+            
+            # Extract data for requested substances
+            thermo_data = {}
+            
+            for substance in substances:
+                # Look for exact matches first (case-sensitive)
+                matches = df_clean[df_clean[substance_col].str.strip() == substance.strip()]
+                
+                if matches.empty:
+                    # Try case-insensitive match
+                    matches = df_clean[df_clean[substance_col].str.strip().str.upper() == substance.strip().upper()]
+                
+                if matches.empty:
+                    # Try partial match, but be more specific to avoid false matches
+                    # Only do partial matching for substances with parentheses (like states)
+                    if '(' in substance:
+                        # For substances with states, try matching without being too broad
+                        matches = df_clean[df_clean[substance_col].str.contains(re.escape(substance.strip()), case=False, na=False, regex=True)]
+                    else:
+                        # For simple substances, try exact word boundary matching to avoid H2 matching H2CO3
+                        pattern = r'\b' + re.escape(substance.strip()) + r'\b'
+                        matches = df_clean[df_clean[substance_col].str.contains(pattern, case=False, na=False, regex=True)]
+                
+                if not matches.empty:
+                    # If multiple matches, take the first one
+                    row = matches.iloc[0]
+                    
+                    try:
+                        substance_data = {}
+                        
+                        # Extract enthalpy (ΔfH°) if available
+                        if enthalpy_col in df.columns:
+                            delta_f_h_raw = row[enthalpy_col]
+                            if pd.isna(delta_f_h_raw) or str(delta_f_h_raw).strip() in ['-', '', 'NaN']:
+                                delta_f_h = 0.0
+                            else:
+                                delta_f_h = float(str(delta_f_h_raw).replace(',', '').strip())
+                            substance_data['delta_f_h'] = delta_f_h
+                        
+                        # Extract Gibbs free energy (ΔfG°) if available
+                        if gibbs_col in df.columns:
+                            delta_f_g_raw = row[gibbs_col]
+                            if pd.isna(delta_f_g_raw) or str(delta_f_g_raw).strip() in ['-', '', 'NaN']:
+                                delta_f_g = 0.0
+                            else:
+                                delta_f_g = float(str(delta_f_g_raw).replace(',', '').strip())
+                            substance_data['delta_f_g'] = delta_f_g
+                        
+                        # Extract entropy (S°) if available
+                        if entropy_col in df.columns:
+                            s_standard_raw = row[entropy_col]
+                            if pd.isna(s_standard_raw) or str(s_standard_raw).strip() in ['-', '', 'NaN']:
+                                s_standard = 0.0
+                            else:
+                                s_standard = float(str(s_standard_raw).replace(',', '').strip())
+                            substance_data['s_standard'] = s_standard
+                        
+                        if substance_data:  # Only add if we found some data
+                            thermo_data[substance] = substance_data
+                            
+                            data_str = []
+                            if 'delta_f_h' in substance_data:
+                                data_str.append(f"ΔfH° = {substance_data['delta_f_h']} kJ/mol")
+                            if 'delta_f_g' in substance_data:
+                                data_str.append(f"ΔfG° = {substance_data['delta_f_g']} kJ/mol")
+                            if 's_standard' in substance_data:
+                                data_str.append(f"S° = {substance_data['s_standard']} J/(mol·K)")
+                            
+                            print(f"Found data for {substance}: {', '.join(data_str)}")
+                            
+                    except (ValueError, TypeError) as e:
+                        print(f"Could not parse data for {substance}: {e}")
+                        if enthalpy_col in df.columns:
+                            print(f"Raw enthalpy value: {row[enthalpy_col]}")
+                        if gibbs_col in df.columns:
+                            print(f"Raw Gibbs value: {row[gibbs_col]}")
+                        if entropy_col in df.columns:
+                            print(f"Raw entropy value: {row[entropy_col]}")
+                        continue
+                else:
+                    print(f"No data found for substance: {substance}")
+                    print(f"Available substances in CSV: {df_clean[substance_col].head(10).tolist()}")
+            
+            return thermo_data
+            
+        except Exception as e:
+            print(f"Error reading CSV file: {e}")
+            print(f"Available columns: {df.columns.tolist() if 'df' in locals() else 'Could not read CSV'}")
+            raise Exception(f"Error reading CSV file: {e}")
+    def _get_manual_coefficients(self):
+        """
+        Helper method to manually collect reactants and products when balancer fails.
+        """
+        print("\n--- Enter Reactants ---")
+        reactants = {}
+        num_reactants = int(input("How many different reactants? "))
+        
+        for i in range(num_reactants):
+            substance = input(f"Reactant {i+1} name/formula: ").strip()
+            coeff = float(input(f"Coefficient for {substance}: "))
+            reactants[substance] = coeff
+        
+        print("\n--- Enter Products ---")
+        products = {}
+        num_products = int(input("How many different products? "))
+        
+        for i in range(num_products):
+            substance = input(f"Product {i+1} name/formula: ").strip()
+            coeff = float(input(f"Coefficient for {substance}: "))
+            products[substance] = coeff
+        
+        return reactants, products
+
+    def _get_manual_thermodynamic_data(self, substances):
+        """
+        Helper method to manually collect thermodynamic data when CSV extraction fails.
+        """
+        print(f"\n--- Enter Formation Enthalpies (ΔHf°) ---")
+        print("Note: Elements in their standard state have ΔHf° = 0")
+        formation_enthalpies = {}
+        
+        for substance in sorted(substances):
+            default_hint = " (0 for elements)" if substance in ['H2', 'N2', 'O2', 'F2', 'Cl2', 'Br2', 'I2'] else ""
+            value = input(f"ΔHf° for {substance} (kJ/mol){default_hint}: ")
+            formation_enthalpies[substance] = float(value) if value else 0.0
+        
+        print(f"\n--- Enter Standard Entropies (S°) ---")
+        standard_entropies = {}
+        
+        for substance in sorted(substances):
+            value = float(input(f"S° for {substance} (J/(mol·K)): "))
+            standard_entropies[substance] = value
+        
+        return formation_enthalpies, standard_entropies

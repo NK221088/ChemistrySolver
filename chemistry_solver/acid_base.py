@@ -1,5 +1,6 @@
 """
-Acid-Base Analysis Module for Chemistry Problem Solver
+Complete Acid-Base Chemistry Solver
+Handles strong/weak acids/bases with automatic compound identification
 """
 import math
 
@@ -29,15 +30,22 @@ def identify_acid_base(compound):
         "H3PO4": "Phosphoric acid - can donate H+ ions",
         "CH3COOH": "Acetic acid - carboxylic acid that donates H+ from -COOH group",
         "HCOOH": "Formic acid - carboxylic acid that donates H+ from -COOH group",
-        "H2CO3": "Carbonic acid - can donate H+ ions"
+        "H2CO3": "Carbonic acid - can donate H+ ions",
+        "HClO4": "Perchloric acid - donates H+ in solution",
+        "HClO3": "Chloric acid - donates H+ in solution"
     }
     
     # Common bases dictionary
     common_bases = {
         "NaOH": "Sodium hydroxide - releases OH- which accepts H+",
         "KOH": "Potassium hydroxide - releases OH- which accepts H+",
+        "LiOH": "Lithium hydroxide - releases OH- which accepts H+",
+        "RbOH": "Rubidium hydroxide - releases OH- which accepts H+",
+        "CsOH": "Cesium hydroxide - releases OH- which accepts H+",
         "NH3": "Ammonia - accepts H+ with its lone pair",
         "Ca(OH)2": "Calcium hydroxide - releases OH- which accepts H+",
+        "Sr(OH)2": "Strontium hydroxide - releases OH- which accepts H+",
+        "Ba(OH)2": "Barium hydroxide - releases OH- which accepts H+",
         "Mg(OH)2": "Magnesium hydroxide - releases OH- which accepts H+",
         "NaH": "Sodium hydride - contains H- which acts as a proton acceptor",
         "KH": "Potassium hydride - contains H- which acts as a proton acceptor",
@@ -109,39 +117,9 @@ def identify_acid_base(compound):
         "explanation": f"Cannot confidently classify {compound} without more information about its structure and properties."
     }
 
-def analyze_compound_list(compounds):
-    """
-    Analyzes a list of compounds and determines if they are all acids.
-    
-    Args:
-        compounds (list): List of chemical formulas
-    
-    Returns:
-        dict: Results for each compound and overall analysis
-    """
-    results = []
-    all_acids = True
-    
-    for compound in compounds:
-        result = identify_acid_base(compound)
-        results.append({
-            "compound": compound,
-            "classification": result["classification"],
-            "explanation": result["explanation"]
-        })
-        
-        # Check if this compound is NOT an acid
-        if "Acid" not in result["classification"] or "Neutral" in result["classification"]:
-            all_acids = False
-    
-    return {
-        "compounds": results,
-        "all_acids": all_acids
-    }
-
 class AcidBaseEquilibrium:
     """
-    Class for handling acid-base equilibrium calculations
+    Complete class for handling all types of acid-base equilibrium calculations
     """
     
     def __init__(self):
@@ -181,6 +159,120 @@ class AcidBaseEquilibrium:
             "NH4OH": 1.8e-5          # Ammonium hydroxide
         }
     
+    def get_acid_ka(self, formula):
+        """Get the Ka value for a specific acid"""
+        if formula in self.weak_acid_ka:
+            return self.weak_acid_ka[formula]
+        return None
+    
+    def get_base_kb(self, formula):
+        """Get the Kb value for a specific base"""
+        if formula in self.weak_base_kb:
+            return self.weak_base_kb[formula]
+        return None
+    
+    def solve_strong_acid_equilibrium(self, formula, initial_concentration):
+        """
+        Calculate pH for a strong acid solution
+        
+        Args:
+            formula (str): Chemical formula of the strong acid
+            initial_concentration (float): Initial concentration of the acid in mol/L
+            
+        Returns:
+            dict: Contains calculated pH and concentrations
+        """
+        # List of common strong acids
+        strong_acids = ["HCl", "HBr", "HI", "HNO3", "H2SO4", "HClO4", "HClO3"]
+        
+        # Check if it's a strong acid
+        compound_info = identify_acid_base(formula)
+        if "Acid" not in compound_info["classification"]:
+            return {
+                "error": f"{formula} is not identified as an acid.",
+                "classification": compound_info["classification"]
+            }
+        
+        # For strong acids, assume complete dissociation
+        # For diprotic acids like H2SO4, need to account for 2 H+ per molecule
+        if formula == "H2SO4":
+            h_concentration = 2 * initial_concentration
+        elif formula == "H3PO4" and formula in strong_acids:  # If treating as strong
+            h_concentration = 3 * initial_concentration
+        else:
+            h_concentration = initial_concentration
+        
+        # Calculate pH
+        if h_concentration <= 0:
+            return {"error": "Concentration must be positive"}
+        
+        ph = -math.log10(h_concentration)
+        
+        # Calculate pOH and OH- concentration
+        poh = 14 - ph
+        oh_concentration = 10**(-poh)
+        
+        return {
+            "formula": formula,
+            "initial_concentration": initial_concentration,
+            "h_concentration": h_concentration,
+            "oh_concentration": oh_concentration,
+            "ph": ph,
+            "poh": poh,
+            "acid_type": "strong",
+            "complete_dissociation": True
+        }
+    
+    def solve_strong_base_equilibrium(self, formula, initial_concentration):
+        """
+        Calculate pH for a strong base solution
+        
+        Args:
+            formula (str): Chemical formula of the strong base
+            initial_concentration (float): Initial concentration of the base in mol/L
+            
+        Returns:
+            dict: Contains calculated pH and concentrations
+        """
+        # List of common strong bases
+        strong_bases = ["NaOH", "KOH", "LiOH", "RbOH", "CsOH", "Ca(OH)2", "Sr(OH)2", "Ba(OH)2"]
+        
+        # Check if it's a base
+        compound_info = identify_acid_base(formula)
+        if "Base" not in compound_info["classification"]:
+            return {
+                "error": f"{formula} is not identified as a base.",
+                "classification": compound_info["classification"]
+            }
+        
+        # For strong bases, assume complete dissociation
+        # For bases with multiple OH- groups, need to account for multiple OH- per molecule
+        if formula in ["Ca(OH)2", "Sr(OH)2", "Ba(OH)2", "Mg(OH)2"]:
+            oh_concentration = 2 * initial_concentration
+        else:
+            oh_concentration = initial_concentration
+        
+        # Calculate pOH and pH
+        if oh_concentration <= 0:
+            return {"error": "Concentration must be positive"}
+        
+        poh = -math.log10(oh_concentration)
+        ph = 14 - poh  # at 25°C, pH + pOH = 14
+        
+        # Calculate H+ concentration
+        h_concentration = 10**(-ph)
+        
+        return {
+            "formula": formula,
+            "initial_concentration": initial_concentration,
+            "oh_concentration": oh_concentration,
+            "h_concentration": h_concentration,
+            "ph": ph,
+            "poh": poh,
+            "base_type": "strong",
+            "complete_dissociation": True
+        }
+    
     def solve_weak_acid_equilibrium(self, formula, initial_concentration, ka=None):
         """
         Calculate equilibrium concentrations and pH for a weak acid solution
@@ -218,9 +310,6 @@ class AcidBaseEquilibrium:
         # x² + Ka*x - Ka*C₀ = 0
         # x = (-Ka + √(Ka² + 4*Ka*C₀))/2
         
-        # If Ka is very small compared to C₀, we can use the approximation x = √(Ka*C₀)
-        # but we'll use the quadratic formula for better accuracy
-        
         a = 1
         b = ka
         c = -ka * initial_concentration
@@ -236,8 +325,10 @@ class AcidBaseEquilibrium:
         a_concentration = x  # [A⁻]
         ha_concentration = initial_concentration - x  # [HA]
         
-        # Calculate pH
+        # Calculate pH and pOH
         ph = -math.log10(h_concentration)
+        poh = 14 - ph
+        oh_concentration = 10**(-poh)
         
         # Calculate percent dissociation
         percent_dissociation = (x / initial_concentration) * 100
@@ -247,10 +338,13 @@ class AcidBaseEquilibrium:
             "initial_concentration": initial_concentration,
             "ka": ka,
             "h_concentration": h_concentration,
+            "oh_concentration": oh_concentration,
             "conjugate_base_concentration": a_concentration,
             "undissociated_concentration": ha_concentration,
             "ph": ph,
+            "poh": poh,
             "percent_dissociation": percent_dissociation,
+            "acid_type": "weak",
             "is_approximation_valid": (ka / initial_concentration < 0.05)
         }
     
@@ -309,6 +403,7 @@ class AcidBaseEquilibrium:
         # Calculate pOH and pH
         poh = -math.log10(oh_concentration)
         ph = 14 - poh  # at 25°C, pH + pOH = 14
+        h_concentration = 10**(-ph)
         
         # Calculate percent ionization
         percent_ionization = (x / initial_concentration) * 100
@@ -318,190 +413,133 @@ class AcidBaseEquilibrium:
             "initial_concentration": initial_concentration,
             "kb": kb,
             "oh_concentration": oh_concentration,
+            "h_concentration": h_concentration,
             "conjugate_acid_concentration": bh_concentration,
             "undissociated_concentration": b_concentration,
             "ph": ph,
             "poh": poh,
             "percent_ionization": percent_ionization,
+            "base_type": "weak",
             "is_approximation_valid": (kb / initial_concentration < 0.05)
         }
     
-    def verify_weak_acid_statements(self, formula, initial_concentration, ka=None):
+    def solve_ph_problem(self, formula, concentration, acid_base_type=None, ka=None, kb=None):
         """
-        Verifies statements about weak acid solutions
+        General pH solver that automatically determines if compound is strong/weak acid/base
         
         Args:
-            formula (str): Chemical formula of the weak acid
-            initial_concentration (float): Initial concentration of the acid in mol/L
-            ka (float, optional): Acid dissociation constant
+            formula (str): Chemical formula
+            concentration (float): Concentration in mol/L
+            acid_base_type (str, optional): Force specific calculation type
+                                          Options: 'strong_acid', 'weak_acid', 'strong_base', 'weak_base'
+            ka (float, optional): Acid dissociation constant for weak acids
+            kb (float, optional): Base dissociation constant for weak bases
             
         Returns:
-            dict: Truth values for common statements about weak acid solutions
+            dict: Complete pH calculation results
         """
-        # Get the equilibrium values
+        # Identify the compound
+        compound_info = identify_acid_base(formula)
+        
+        # Lists of strong acids and bases
+        strong_acids = ["HCl", "HBr", "HI", "HNO3", "H2SO4", "HClO4", "HClO3"]
+        strong_bases = ["NaOH", "KOH", "LiOH", "RbOH", "CsOH", "Ca(OH)2", "Sr(OH)2", "Ba(OH)2"]
+        
+        # Determine calculation type if not specified
+        if acid_base_type is None:
+            if "Acid" in compound_info["classification"]:
+                if formula in strong_acids:
+                    acid_base_type = "strong_acid"
+                else:
+                    acid_base_type = "weak_acid"
+            elif "Base" in compound_info["classification"]:
+                if formula in strong_bases:
+                    acid_base_type = "strong_base"
+                else:
+                    acid_base_type = "weak_base"
+            else:
+                return {
+                    "error": f"Cannot determine if {formula} is an acid or base.",
+                    "classification": compound_info["classification"]
+                }
+        
+        # Perform appropriate calculation
+        if acid_base_type == "strong_acid":
+            return self.solve_strong_acid_equilibrium(formula, concentration)
+        elif acid_base_type == "weak_acid":
+            return self.solve_weak_acid_equilibrium(formula, concentration, ka)
+        elif acid_base_type == "strong_base":
+            return self.solve_strong_base_equilibrium(formula, concentration)
+        elif acid_base_type == "weak_base":
+            return self.solve_weak_base_equilibrium(formula, concentration, kb)
+        else:
+            return {"error": f"Invalid acid_base_type: {acid_base_type}"}
+    
+    def analyze_weak_acid_question(self, options, initial_concentration=1.0, formula="HX", ka=1e-5):
+        """
+        Analyzes a multiple choice question about weak acids
+        
+        Args:
+            options (list): List of statement options to verify
+            initial_concentration (float): Initial concentration of the acid
+            formula (str): Chemical formula of the acid
+            ka (float): Acid dissociation constant
+            
+        Returns:
+            dict: Analysis of each option and the correct answer
+        """
+        # Get equilibrium data
         equilibrium = self.solve_weak_acid_equilibrium(formula, initial_concentration, ka)
         
         if "error" in equilibrium:
             return {"error": equilibrium["error"]}
         
-        # Extract values
+        # Extract key values
         h_concentration = equilibrium["h_concentration"]
-        a_concentration = equilibrium["conjugate_base_concentration"]
-        ha_concentration = equilibrium["undissociated_concentration"]
+        x_concentration = equilibrium["conjugate_base_concentration"]
+        hx_concentration = equilibrium["undissociated_concentration"]
         ph = equilibrium["ph"]
         
-        # Verify common statements
-        statements = {
-            "ph_equals_0": abs(ph) < 0.01,
-            "conjugate_base_equals_initial": abs(a_concentration - initial_concentration) < 0.0001,
-            "undissociated_greater_than_h": ha_concentration > h_concentration,
-            "h_equals_initial": abs(h_concentration - initial_concentration) < 0.0001,
-            "ph_equals_negative_log_initial": abs(ph - (-math.log10(initial_concentration))) < 0.01,
-            "percent_dissociation_100": abs(equilibrium["percent_dissociation"] - 100) < 0.1,
-            "percent_dissociation_less_than_5": equilibrium["percent_dissociation"] < 5
-        }
+        # Analyze each option
+        analysis = {}
+        for i, option in enumerate(options):
+            is_correct = False
+            explanation = ""
+            
+            # Common option patterns
+            if "pH = 0" in option:
+                is_correct = abs(ph) < 0.01
+                explanation = f"The pH is actually {ph:.4f}, not 0. This would only be true for a 1M strong acid."
+                
+            elif "[X-] = 1 M" in option or "[X⁻] = 1 M" in option:
+                is_correct = abs(x_concentration - initial_concentration) < 0.0001
+                explanation = f"[X⁻] = {x_concentration:.4e} M, which is less than 1 M because the weak acid only partially dissociates."
+                
+            elif "[HX] > [H+]" in option or "[HX] > [H⁺]" in option:
+                is_correct = hx_concentration > h_concentration
+                explanation = f"[HX] = {hx_concentration:.4e} M, which is {'greater' if is_correct else 'not greater'} than [H⁺] = {h_concentration:.4e} M."
+                
+            elif "[H+] = 1 M" in option or "[H⁺] = 1 M" in option:
+                is_correct = abs(h_concentration - initial_concentration) < 0.0001
+                explanation = f"[H⁺] = {h_concentration:.4e} M, which is much less than 1 M because the weak acid only partially dissociates."
+                
+            elif "both" in option.lower():
+                explanation = "This option depends on which individual options are correct."
+            
+            analysis[f"option_{i+1}"] = {
+                "statement": option,
+                "is_correct": is_correct,
+                "explanation": explanation
+            }
         
-        # Additional calculations
-        statements["is_strong_acid"] = statements["h_equals_initial"]
-        statements["is_weak_acid"] = statements["undissociated_greater_than_h"]
+        # Find the correct answer
+        correct_options = [i+1 for i, data in enumerate(analysis.values()) if data["is_correct"]]
         
         return {
             "equilibrium_data": equilibrium,
-            "statements": statements,
-            "explanation": self._generate_explanation(statements, equilibrium)
+            "options_analysis": analysis,
+            "correct_options": correct_options,
+            "summary": f"For a {initial_concentration} M solution of weak acid {formula} with Ka = {ka}, "
+                     f"the equilibrium concentrations are: [H⁺] = {h_concentration:.4e} M, "
+                     f"[X⁻] = {x_concentration:.4e} M, [HX] = {hx_concentration:.4e} M, pH = {ph:.4f}"
         }
-    
-    def _generate_explanation(self, statements, equilibrium):
-        """
-        Generates explanations for the verified statements
-        
-        Args:
-            statements (dict): Truth values for common statements
-            equilibrium (dict): Equilibrium data
-            
-        Returns:
-            str: Explanation
-        """
-        explanations = []
-        
-        # Extract key values for explanation
-        h_conc = equilibrium["h_concentration"]
-        undissociated = equilibrium["undissociated_concentration"]
-        conjugate_base = equilibrium["conjugate_base_concentration"]
-        initial = equilibrium["initial_concentration"]
-        ph = equilibrium["ph"]
-        percent = equilibrium["percent_dissociation"]
-        
-        # Build explanation
-        if statements["is_strong_acid"]:
-            explanations.append(
-                f"This behaves like a strong acid with [H⁺] ≈ {h_conc:.2e} M, very close to the "
-                f"initial concentration of {initial:.2f} M."
-            )
-        elif statements["is_weak_acid"]:
-            explanations.append(
-                f"This is a weak acid with only {percent:.2f}% dissociation. "
-                f"The undissociated form [HX] = {undissociated:.2e} M is greater than "
-                f"[H⁺] = {h_conc:.2e} M."
-            )
-        
-        if statements["ph_equals_0"]:
-            explanations.append(f"The pH is approximately 0 (actual pH = {ph:.2f}).")
-        else:
-            explanations.append(f"The pH is {ph:.2f}, which is greater than 0 as expected for a weak acid solution.")
-        
-        if statements["conjugate_base_equals_initial"]:
-            explanations.append(f"The conjugate base concentration [X⁻] = {conjugate_base:.2e} M equals the initial acid concentration.")
-        else:
-            explanations.append(
-                f"The conjugate base concentration [X⁻] = {conjugate_base:.2e} M is less than the "
-                f"initial acid concentration of {initial:.2f} M due to incomplete dissociation."
-            )
-        
-        return "\n".join(explanations)
-    
-    def get_acid_ka(self, formula):
-        """Get the Ka value for a specific acid"""
-        if formula in self.weak_acid_ka:
-            return self.weak_acid_ka[formula]
-        return None
-    
-    def get_base_kb(self, formula):
-        """Get the Kb value for a specific base"""
-        if formula in self.weak_base_kb:
-            return self.weak_base_kb[formula]
-        return None
-
-def analyze_weak_acid_question(options, initial_concentration=1.0, formula="HX", ka=1e-5):
-    """
-    Analyzes a multiple choice question about weak acids
-    
-    Args:
-        options (list): List of statement options to verify
-        initial_concentration (float): Initial concentration of the acid
-        formula (str): Chemical formula of the acid
-        ka (float): Acid dissociation constant
-        
-    Returns:
-        dict: Analysis of each option and the correct answer
-    """
-    solver = AcidBaseEquilibrium()
-    
-    # Get equilibrium data
-    equilibrium = solver.solve_weak_acid_equilibrium(formula, initial_concentration, ka)
-    
-    if "error" in equilibrium:
-        return {"error": equilibrium["error"]}
-    
-    # Extract key values
-    h_concentration = equilibrium["h_concentration"]
-    x_concentration = equilibrium["conjugate_base_concentration"]
-    hx_concentration = equilibrium["undissociated_concentration"]
-    ph = equilibrium["ph"]
-    
-    # Analyze each option
-    analysis = {}
-    for i, option in enumerate(options):
-        is_correct = False
-        explanation = ""
-        
-        # Common option patterns
-        if "pH = 0" in option:
-            is_correct = abs(ph) < 0.01
-            explanation = f"The pH is actually {ph:.4f}, not 0. This would only be true for a 1M strong acid."
-            
-        elif "[X-] = 1 M" in option or "[X⁻] = 1 M" in option:
-            is_correct = abs(x_concentration - initial_concentration) < 0.0001
-            explanation = f"[X⁻] = {x_concentration:.4e} M, which is less than 1 M because the weak acid only partially dissociates."
-            
-        elif "[HX] > [H+]" in option or "[HX] > [H⁺]" in option:
-            is_correct = hx_concentration > h_concentration
-            explanation = f"[HX] = {hx_concentration:.4e} M, which is greater than [H⁺] = {h_concentration:.4e} M because the weak acid only partially dissociates."
-            
-        elif "[H+] = 1 M" in option or "[H⁺] = 1 M" in option:
-            is_correct = abs(h_concentration - initial_concentration) < 0.0001
-            explanation = f"[H⁺] = {h_concentration:.4e} M, which is much less than 1 M because the weak acid only partially dissociates."
-            
-        elif "both" in option.lower():
-            # This would depend on which options are referred to
-            explanation = "This option depends on which individual options are correct."
-            # Would need to analyze which specific options are being combined
-        
-        analysis[f"option_{i+1}"] = {
-            "statement": option,
-            "is_correct": is_correct,
-            "explanation": explanation
-        }
-    
-    # Find the correct answer
-    correct_options = [i+1 for i, data in enumerate(analysis.values()) if data["is_correct"]]
-    
-    return {
-        "equilibrium_data": equilibrium,
-        "options_analysis": analysis,
-        "correct_options": correct_options,
-        "summary": f"For a {initial_concentration} M solution of weak acid {formula} with Ka = {ka}, "
-                 f"the equilibrium concentrations are: [H⁺] = {h_concentration:.4e} M, "
-                 f"[X⁻] = {x_concentration:.4e} M, [HX] = {hx_concentration:.4e} M, pH = {ph:.4f}"
-    }
-    

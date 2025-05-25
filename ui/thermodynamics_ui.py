@@ -432,27 +432,45 @@ class ThermodynamicsUI:
             print("\n--- Enter Known Reactions ---")
             print("For each reaction, use the format: 'reactants → products ΔH° = value'")
             print("Example: 'C (graphite) + O2 (g) → CO2 (g) ΔH° = -393.5 kJ/mol'")
+            print("Note: You can use fractions like '1/2 O2 (g)' for coefficients")
             
             known_reactions = []
-            num_known = int(input("\nHow many known reactions do you want to enter? "))
+            
+            while True:
+                try:
+                    num_known = int(input("\nHow many known reactions do you want to enter? "))
+                    break
+                except ValueError:
+                    print("Please enter a valid number.")
             
             for i in range(num_known):
-                reaction_str = input(f"Reaction {i+1}: ")
-                try:
-                    reaction = parse_reaction_string(reaction_str)
-                    known_reactions.append(reaction)
-                    print(f"Parsed: {reaction}")
-                except ValueError as e:
-                    print(f"Error parsing reaction: {e}")
-                    print("Please try again.")
-                    reaction_str = input(f"Reaction {i+1}: ")
-                    reaction = parse_reaction_string(reaction_str)
-                    known_reactions.append(reaction)
+                while True:
+                    try:
+                        reaction_str = input(f"Reaction {i+1}: ")
+                        reaction = parse_reaction_string(reaction_str)
+                        if reaction.enthalpy is None:
+                            print("Warning: No enthalpy value found. Please include ΔH° = value")
+                            continue
+                        known_reactions.append(reaction)
+                        print(f"Parsed: {reaction}")
+                        break
+                    except ValueError as e:
+                        print(f"Error parsing reaction: {e}")
+                        print("Please try again with the correct format.")
             
             print("\n--- Enter Target Reaction ---")
             print("Enter the reaction for which you want to calculate the enthalpy change:")
-            target_str = input("Target reaction: ")
-            target_reaction = parse_reaction_string(target_str)
+            print("(Don't include the ΔH° value - that's what we're solving for)")
+            
+            while True:
+                try:
+                    target_str = input("Target reaction: ")
+                    target_reaction = parse_reaction_string(target_str)
+                    target_reaction.enthalpy = None  # Make sure it's None
+                    break
+                except ValueError as e:
+                    print(f"Error parsing reaction: {e}")
+                    print("Please try again.")
             
             # Calculate the result
             result = solve_combustion_enthalpy(known_reactions, target_reaction)

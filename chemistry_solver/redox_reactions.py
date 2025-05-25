@@ -18,6 +18,8 @@ from chemistry_solver.redox_data import (
     get_reducing_agent
 )
 
+from chemistry_solver.oxidation_state import calculate_oxidation_number, parse_formula
+
 def parse_complex_redox_reaction(reaction):
     """
     Parse a complex redox reaction involving polyatomic ions and multiple
@@ -662,3 +664,323 @@ def get_half_reaction_by_element(element, state=None):
             })
     
     return results
+
+def identify_redox_from_oxidation_states(reaction):
+    """
+    Identify oxidation and reduction by analyzing oxidation state changes.
+    
+    Args:
+        reaction (str): Chemical equation for a redox reaction
+        
+    Returns:
+        dict: Dictionary containing oxidation state analysis and redox identification
+    """
+    # Clean and standardize the reaction
+    reaction = reaction.replace("→", "->").replace("⟶", "->")
+    
+    # Split into reactants and products
+    parts = reaction.split("->")
+    if len(parts) != 2:
+        raise ValueError("Invalid reaction format. Use '->' or '→' to separate reactants and products.")
+        
+    reactants = [r.strip() for r in parts[0].split("+")]
+    products = [p.strip() for p in parts[1].split("+")]
+    
+    # Track oxidation state changes
+    oxidation_changes = {}
+    element_compounds = {}
+    
+    # Analyze reactants
+    for compound in reactants:
+        # Remove state notations like (s), (aq), (g), (l)
+        clean_compound = compound.replace("(s)", "").replace("(aq)", "").replace("(g)", "").replace("(l)", "").strip()
+        
+        try:
+            elements, charge = parse_formula(clean_compound)
+            for element in elements:
+                try:
+                    ox_result = calculate_oxidation_number(clean_compound, element)
+                    ox_state = ox_result["oxidation_number"]
+                    
+                    if element not in oxidation_changes:
+                        oxidation_changes[element] = {"reactant": [], "product": []}
+                        element_compounds[element] = {"reactant": [], "product": []}
+                    
+                    oxidation_changes[element]["reactant"].append(ox_state)
+                    element_compounds[element]["reactant"].append(compound)
+                except (ValueError, KeyError):
+                    continue
+        except Exception:
+            continue
+    
+    # Analyze products
+    for compound in products:
+        # Remove state notations
+        clean_compound = compound.replace("(s)", "").replace("(aq)", "").replace("(g)", "").replace("(l)", "").strip()
+        
+        try:
+            elements, charge = parse_formula(clean_compound)
+            for element in elements:
+                try:
+                    ox_result = calculate_oxidation_number(clean_compound, element)
+                    ox_state = ox_result["oxidation_number"]
+                    
+                    if element not in oxidation_changes:
+                        oxidation_changes[element] = {"reactant": [], "product": []}
+                        element_compounds[element] = {"reactant": [], "product": []}
+                    
+                    oxidation_changes[element]["product"].append(ox_state)
+                    element_compounds[element]["product"].append(compound)
+                except (ValueError, KeyError):
+                    continue
+        except Exception:
+            continue
+    
+    # Identify which elements are oxidized and reduced
+    oxidized_elements = []
+    reduced_elements = []
+    oxidation_analysis = []
+    
+    for element, states in oxidation_changes.items():
+        if states["reactant"] and states["product"]:
+            reactant_state = states["reactant"][0]  # Take first occurrence
+            product_state = states["product"][0]    # Take first occurrence
+            
+            if reactant_state < product_state:
+                # Oxidation (increase in oxidation state)
+                oxidized_elements.append({
+                    "element": element,
+                    "from_state": reactant_state,
+                    "to_state": product_state,
+                    "change": product_state - reactant_state,
+                    "reactant_compound": element_compounds[element]["reactant"][0],
+                    "product_compound": element_compounds[element]["product"][0]
+                })
+                oxidation_analysis.append(f"{element}: {reactant_state} → {product_state} (oxidized, loses {product_state - reactant_state} electrons)")
+                
+            elif reactant_state > product_state:
+                # Reduction (decrease in oxidation state)
+                reduced_elements.append({
+                    "element": element,
+                    "from_state": reactant_state,
+                    "to_state": product_state,
+                    "change": reactant_state - product_state,
+                    "reactant_compound": element_compounds[element]["reactant"][0],
+                    "product_compound": element_compounds[element]["product"][0]
+                })
+                oxidation_analysis.append(f"{element}: {reactant_state} → {product_state} (reduced, gains {reactant_state - product_state} electrons)")
+            else:
+                oxidation_analysis.append(f"{element}: {reactant_state} → {product_state} (no change)")
+    
+    return {
+        "oxidized_elements": oxidized_elements,
+        "reduced_elements": reduced_elements,
+        "oxidation_analysis": oxidation_analysis,
+        "is_redox": len(oxidized_elements) > 0 and len(reduced_elements) > 0
+    }
+
+# Add this enhanced version of parse_redox_reaction that uses oxidation states
+def enhanced_parse_redox_reaction_with_oxidation_states(reaction):
+    """
+    Enhanced version that uses oxidation state analysis to identify redox reactions.
+    
+    Args:
+        reaction (str): Chemical equation for a redox reaction
+        
+    Returns:
+        dict: Enhanced dictionary with oxidation state analysis
+    """
+    # First get the original parsing result
+    original_result = parse_redox_reaction(reaction)
+    
+    # Add oxidation state analysis
+    try:
+        ox_analysis = identify_redox_from_oxidation_states(reaction)
+        
+        # Enhance the result with oxidation state information
+        enhanced_result = original_result.copy()
+        enhanced_result.update({
+            "oxidation_state_analysis": ox_analysis["oxidation_analysis"],
+            "oxidized_elements": ox_analysis["oxidized_elements"],
+            "reduced_elements": ox_analysis["reduced_elements"],
+            "confirmed_redox": ox_analysis["is_redox"]
+        })
+        
+        # If original parsing couldn't identify agents, try using oxidation state analysis
+        if (not original_result.get("oxidizing_agent") or not original_result.get("reducing_agent")) and ox_analysis["is_redox"]:
+            if ox_analysis["oxidized_elements"]:
+                enhanced_result["reducing_agent"] = ox_analysis["oxidized_elements"][0]["reactant_compound"]
+            if ox_analysis["reduced_elements"]:
+                enhanced_result["oxidizing_agent"] = ox_analysis["reduced_elements"][0]["reactant_compound"]
+        
+        return enhanced_result
+        
+    except Exception as e:
+        # If oxidation state analysis fails, return original result with error note
+        enhanced_result = original_result.copy()
+        enhanced_result["oxidation_state_error"] = str(e)
+        return enhanced_result
+
+# Add this function to validate if a reaction is actually a redox reaction
+def validate_redox_reaction(reaction):
+    """
+    Validate if a given reaction is actually a redox reaction by checking oxidation state changes.
+    
+    Args:
+        reaction (str): Chemical equation to validate
+        
+    Returns:
+        dict: Validation results with detailed analysis
+    """
+    try:
+        ox_analysis = identify_redox_from_oxidation_states(reaction)
+        
+        validation_steps = [
+            f"1. Analyzing oxidation states in reaction: {reaction}",
+            "2. Oxidation state changes found:"
+        ]
+        
+        if ox_analysis["oxidation_analysis"]:
+            validation_steps.extend([f"   - {analysis}" for analysis in ox_analysis["oxidation_analysis"]])
+        else:
+            validation_steps.append("   - No oxidation state changes detected")
+        
+        if ox_analysis["is_redox"]:
+            validation_steps.extend([
+                "3. This IS a redox reaction:",
+                f"   - Elements oxidized: {', '.join([elem['element'] for elem in ox_analysis['oxidized_elements']])}",
+                f"   - Elements reduced: {', '.join([elem['element'] for elem in ox_analysis['reduced_elements']])}"
+            ])
+        else:
+            validation_steps.append("3. This is NOT a redox reaction (no electron transfer detected)")
+        
+        return {
+            "is_redox": ox_analysis["is_redox"],
+            "oxidized_elements": ox_analysis["oxidized_elements"],
+            "reduced_elements": ox_analysis["reduced_elements"],
+            "validation_steps": validation_steps,
+            "message": "Valid redox reaction" if ox_analysis["is_redox"] else "Not a redox reaction"
+        }
+        
+    except Exception as e:
+        return {
+            "is_redox": None,
+            "message": f"Error during validation: {str(e)}",
+            "validation_steps": [f"Error occurred: {str(e)}"]
+        }
+
+# Replace the existing enhanced_determine_redox_favorability function with this version
+def enhanced_determine_redox_favorability_with_oxidation_states(reaction):
+    """
+    Enhanced version that includes oxidation state analysis in favorability determination.
+    
+    Args:
+        reaction (str): Chemical equation for a redox reaction
+        
+    Returns:
+        dict: Results with oxidation state analysis and favorability information
+    """
+    try:
+        # First validate that this is actually a redox reaction
+        validation = validate_redox_reaction(reaction)
+        
+        if not validation["is_redox"]:
+            return {
+                "favorable": None,
+                "message": "Not a redox reaction",
+                "validation": validation,
+                "steps": validation["validation_steps"] + ["Cannot determine favorability for non-redox reactions."]
+            }
+        
+        # Get enhanced parsing with oxidation states
+        enhanced_parsing = enhanced_parse_redox_reaction_with_oxidation_states(reaction)
+        
+        # Try to get favorability using existing methods
+        favorability_result = enhanced_determine_redox_favorability(reaction)
+        
+        # Combine results
+        combined_result = favorability_result.copy()
+        combined_result.update({
+            "validation": validation,
+            "oxidation_state_analysis": enhanced_parsing.get("oxidation_state_analysis", []),
+            "oxidized_elements": enhanced_parsing.get("oxidized_elements", []),
+            "reduced_elements": enhanced_parsing.get("reduced_elements", [])
+        })
+        
+        # Enhance steps with oxidation state information
+        if "steps" in combined_result:
+            oxidation_steps = [
+                "Oxidation State Analysis:",
+                *[f"   - {analysis}" for analysis in enhanced_parsing.get("oxidation_state_analysis", [])]
+            ]
+            combined_result["steps"] = oxidation_steps + [""] + combined_result["steps"]
+        
+        return combined_result
+        
+    except Exception as e:
+        return {
+            "favorable": None,
+            "message": f"Error: {str(e)}",
+            "steps": [f"An error occurred: {str(e)}"]
+        }
+
+# Add this function to balance redox equations using oxidation state information
+def balance_redox_equation_with_oxidation_states(reaction):
+    """
+    Attempt to balance a redox equation using oxidation state information.
+    
+    Args:
+        reaction (str): Unbalanced chemical equation
+        
+    Returns:
+        dict: Balancing information and suggested balanced equation
+    """
+    try:
+        ox_analysis = identify_redox_from_oxidation_states(reaction)
+        
+        balancing_steps = [
+            f"1. Analyzing unbalanced equation: {reaction}",
+            "2. Oxidation state changes:"
+        ]
+        
+        if ox_analysis["oxidation_analysis"]:
+            balancing_steps.extend([f"   - {analysis}" for analysis in ox_analysis["oxidation_analysis"]])
+        
+        if not ox_analysis["is_redox"]:
+            return {
+                "balanced_equation": reaction,
+                "message": "Not a redox reaction - no balancing needed",
+                "steps": balancing_steps + ["3. No electron transfer detected"]
+            }
+        
+        # Calculate electron transfer
+        total_electrons_lost = sum(elem["change"] for elem in ox_analysis["oxidized_elements"])
+        total_electrons_gained = sum(elem["change"] for elem in ox_analysis["reduced_elements"])
+        
+        balancing_steps.extend([
+            f"3. Total electrons lost: {total_electrons_lost}",
+            f"4. Total electrons gained: {total_electrons_gained}",
+            "5. For a balanced equation, electrons lost must equal electrons gained"
+        ])
+        
+        if total_electrons_lost != total_electrons_gained:
+            balancing_steps.append("6. Equation needs balancing - use half-reaction method or algebraic method")
+        else:
+            balancing_steps.append("6. Electron transfer is already balanced")
+        
+        return {
+            "balanced_equation": "[Use half-reaction method to balance]",
+            "electrons_lost": total_electrons_lost,
+            "electrons_gained": total_electrons_gained,
+            "needs_balancing": total_electrons_lost != total_electrons_gained,
+            "steps": balancing_steps,
+            "oxidized_elements": ox_analysis["oxidized_elements"],
+            "reduced_elements": ox_analysis["reduced_elements"]
+        }
+        
+    except Exception as e:
+        return {
+            "balanced_equation": reaction,
+            "message": f"Error during balancing analysis: {str(e)}",
+            "steps": [f"Error occurred: {str(e)}"]
+        }

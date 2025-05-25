@@ -47,7 +47,7 @@ class OxidationStateUI:
         print("\n===== OXIDATION NUMBER CALCULATOR =====")
         
         try:
-            compound = input("Enter chemical compound (e.g., CrO2Cl2): ").strip()
+            compound = input("Enter chemical compound (e.g., CrO2Cl2, SO4^2-, NH4^+): ").strip()
             element = input("Enter element to find oxidation state for: ").strip()
             
             result = calculate_oxidation_number(compound, element)
@@ -67,13 +67,18 @@ class OxidationStateUI:
         print("\n===== CHEMICAL FORMULA ANALYSIS =====")
         
         try:
-            formula = input("Enter chemical formula to analyze (e.g., Fe2(SO4)3): ").strip()
+            formula = input("Enter chemical formula to analyze (e.g., Fe2(SO4)3, SO4^2-): ").strip()
             
-            # Currently only handling simple formulas without parentheses
-            elements = parse_formula(formula)
+            # Parse formula to get elements and charge
+            elements, charge = parse_formula(formula)
             
             display_results_header()
             print(f"Formula: {formula}")
+            
+            if charge != 0:
+                charge_sign = "+" if charge > 0 else ""
+                print(f"Charge: {charge_sign}{charge}")
+            
             print("\nElement Composition:")
             for element, count in elements.items():
                 print(f"  {element}: {count}")
@@ -120,6 +125,14 @@ Other Main Group Elements:
 Special Cases:
 - H: +1 (in most compounds), -1 (in metal hydrides)
 - O: -2 (typical), -1 (in peroxides), -1/2 (in superoxides)
+
+Common Ions and Their Charges:
+- Sulfate: SO4^2-
+- Nitrate: NO3^-
+- Phosphate: PO4^3-
+- Ammonium: NH4^+
+- Carbonate: CO3^2-
+- Hydroxide: OH^-
 
 Note: This is not an exhaustive list. Elements can have other oxidation states in specific compounds.
         """

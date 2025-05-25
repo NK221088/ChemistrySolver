@@ -170,6 +170,7 @@ def parse_reaction_string(reaction_str: str) -> Reaction:
 def solve_combustion_enthalpy(known_reactions: List[Reaction], target_reaction: Reaction) -> Dict[str, Any]:
     """
     Solve for the enthalpy of a target reaction using Hess's Law.
+    Uses a systematic approach to find linear combinations of known reactions.
     
     Parameters:
         known_reactions (List[Reaction]): List of known reactions with enthalpies
@@ -180,7 +181,7 @@ def solve_combustion_enthalpy(known_reactions: List[Reaction], target_reaction: 
     """
     steps = []
     
-    steps.append("# Solving for the enthalpy of combustion using Hess's Law")
+    steps.append("# Solving for the enthalpy using Hess's Law")
     steps.append("\n## Given Reactions:")
     for i, reaction in enumerate(known_reactions, 1):
         steps.append(f"Reaction {i}: {reaction}")
@@ -189,79 +190,164 @@ def solve_combustion_enthalpy(known_reactions: List[Reaction], target_reaction: 
     steps.append(f"{target_reaction}")
     
     steps.append("\n## Solution using Hess's Law:")
-    steps.append("We need to manipulate the given reactions to obtain the target reaction:")
     
-    # Create a list of modified reactions
-    modified_reactions = []
-    explanation_steps = []
-    
-    # This is a simplistic approach - in a real solver, we would need more sophisticated logic
-    # Here we'll manually solve for the methanol combustion example
-    
-    # Check if we're solving the methanol combustion example
-    target_substances = set(target_reaction.reactants.keys()) | set(target_reaction.products.keys())
-    
-    # Extract needed substances from reactions
+    # Get all unique substances from all reactions
     all_substances = set()
-    for reaction in known_reactions:
-        all_substances |= set(reaction.reactants.keys()) | set(reaction.products.keys())
+    for reaction in known_reactions + [target_reaction]:
+        all_substances.update(reaction.reactants.keys())
+        all_substances.update(reaction.products.keys())
     
-    # Find the enthalpy for the target reaction using Hess's Law
-    # For this example, we'll do a specific implementation
-    result_reaction = None
+    all_substances = sorted(list(all_substances))
     
-    # For the methanol combustion example
-    # CH3OH (l) + 1.5 O2 (g) → CO2 (g) + 2 H2O (l)
+    # Create coefficient matrix for the system of equations
+    # Each row represents a substance, each column represents a reaction
+    matrix = []
+    target_vector = []
     
-    if "CH3OH" in str(target_reaction) and "CO2" in str(target_reaction) and "H2O" in str(target_reaction):
-        # 1. Start with the methanol formation reaction
-        methanol_formation = next((r for r in known_reactions if "CH3OH" in str(r)), None)
-        if methanol_formation:
-            # Reverse it to get methanol decomposition
-            methanol_decomposition = methanol_formation.reverse()
-            explanation_steps.append(f"1. Reverse the methanol formation reaction:")
-            explanation_steps.append(f"   {methanol_decomposition}")
-            modified_reactions.append(methanol_decomposition)
-            
-            # 2. Use the carbon combustion reaction
-            carbon_combustion = next((r for r in known_reactions if "C (graphite)" in str(r) and "CO2" in str(r)), None)
-            if carbon_combustion:
-                explanation_steps.append(f"\n2. Use the carbon combustion reaction:")
-                explanation_steps.append(f"   {carbon_combustion}")
-                modified_reactions.append(carbon_combustion)
+    for substance in all_substances:
+        row = []
+        # For each known reaction, get the net coefficient for this substance
+        for reaction in known_reactions:
+            net_coeff = reaction.products.get(substance, 0) - reaction.reactants.get(substance, 0)
+            row.append(net_coeff)
+        
+        # Target coefficient for this substance
+        target_coeff = target_reaction.products.get(substance, 0) - target_reaction.reactants.get(substance, 0)
+        target_vector.append(target_coeff)
+        matrix.append(row)
+    
+    # Try to solve the system
+    solution_found = False
+    solution_coefficients = None
+    
+    # Try brute force with common coefficients including fractions
+    solution_coefficients = find_solution_brute_force(matrix, target_vector)
+    if solution_coefficients:
+        solution_found = True
+    
+    if solution_found:
+        steps.append("Found a solution by combining the given reactions:")
+        
+        total_enthalpy = 0
+        used_reactions = []
+        
+        for i, coeff in enumerate(solution_coefficients):
+            if abs(coeff) > 1e-10:  # Skip near-zero coefficients
+                if abs(coeff - 1) < 1e-10:
+                    steps.append(f"• Use Reaction {i+1} as is")
+                    used_reactions.append(known_reactions[i])
+                elif abs(coeff + 1) < 1e-10:
+                    steps.append(f"• Reverse Reaction {i+1}")
+                    reversed_reaction = known_reactions[i].reverse()
+                    used_reactions.append(reversed_reaction)
+                elif abs(coeff - 0.5) < 1e-10:
+                    steps.append(f"• Use half of Reaction {i+1}")
+                    scaled_reaction = known_reactions[i].scale(coeff)
+                    used_reactions.append(scaled_reaction)
+                elif abs(coeff + 0.5) < 1e-10:
+                    steps.append(f"• Reverse half of Reaction {i+1}")
+                    reversed_scaled = known_reactions[i].reverse().scale(abs(coeff))
+                    used_reactions.append(reversed_scaled)
+                elif coeff > 0:
+                    steps.append(f"• Multiply Reaction {i+1} by {coeff}")
+                    scaled_reaction = known_reactions[i].scale(coeff)
+                    used_reactions.append(scaled_reaction)
+                else:  # coeff < 0
+                    steps.append(f"• Reverse Reaction {i+1} and multiply by {abs(coeff)}")
+                    reversed_scaled = known_reactions[i].reverse().scale(abs(coeff))
+                    used_reactions.append(reversed_scaled)
                 
-                # 3. Use the hydrogen combustion reaction (doubled)
-                hydrogen_combustion = next((r for r in known_reactions if "H2" in str(r) and "H2O" in str(r)), None)
-                if hydrogen_combustion:
-                    # We need 2 H2 molecules for methanol
-                    hydrogen_combustion_doubled = hydrogen_combustion.scale(2)
-                    explanation_steps.append(f"\n3. Double the hydrogen combustion reaction:")
-                    explanation_steps.append(f"   {hydrogen_combustion_doubled}")
-                    modified_reactions.append(hydrogen_combustion_doubled)
-                    
-                    # 4. Combine all reactions
-                    result_reaction = methanol_decomposition
-                    for r in [carbon_combustion, hydrogen_combustion_doubled]:
-                        result_reaction = result_reaction.add(r)
-                    
-                    explanation_steps.append(f"\n4. Combine all the reactions:")
-                    explanation_steps.append(f"   {result_reaction}")
-    
-    if result_reaction and result_reaction.enthalpy is not None:
-        steps.extend(explanation_steps)
-        steps.append(f"\n## Final Answer:")
-        steps.append(f"The enthalpy of combustion for the target reaction is {result_reaction.enthalpy:.1f} kJ/mol")
+                total_enthalpy += coeff * known_reactions[i].enthalpy
+        
+        steps.append(f"\n## Calculation:")
+        calculation_parts = []
+        for i, coeff in enumerate(solution_coefficients):
+            if abs(coeff) > 1e-10:  # Skip near-zero coefficients
+                if abs(coeff - 0.5) < 1e-10:
+                    enthalpy_part = f"(1/2) × ({known_reactions[i].enthalpy})"
+                elif abs(coeff + 0.5) < 1e-10:
+                    enthalpy_part = f"(-1/2) × ({known_reactions[i].enthalpy})"
+                else:
+                    enthalpy_part = f"({coeff}) × ({known_reactions[i].enthalpy})"
+                calculation_parts.append(enthalpy_part)
+        
+        calculation_str = " + ".join(calculation_parts)
+        steps.append(f"ΔH° = {calculation_str}")
+        steps.append(f"ΔH° = {total_enthalpy:.1f} kJ/mol")
+        
+        # Create result reaction
+        result_reaction = target_reaction
+        result_reaction.enthalpy = total_enthalpy
+        
     else:
-        steps.append("\nCould not determine the enthalpy using the given reactions.")
+        steps.append("Could not find a solution using the given reactions.")
+        steps.append("This might be because:")
+        steps.append("• The given reactions are insufficient to determine the target reaction")
+        steps.append("• The reactions are not linearly independent")
+        steps.append("• More complex coefficients are needed")
+        result_reaction = None
+        total_enthalpy = None
     
     return {
         "target_reaction": target_reaction,
         "known_reactions": known_reactions,
         "result_reaction": result_reaction,
-        "enthalpy": result_reaction.enthalpy if result_reaction else None,
-        "steps": steps
+        "enthalpy": total_enthalpy,
+        "steps": steps,
+        "solution_found": solution_found
     }
 
+
+def find_solution_brute_force(matrix, target_vector, max_coeff=3):
+    """
+    Find solution to the linear system using brute force.
+    Tries combinations of common coefficients including fractions.
+    """
+    import itertools
+    
+    n_reactions = len(matrix[0]) if matrix else 0
+    
+    # Create list of common coefficients to try
+    coefficients = []
+    
+    # Add integers
+    for i in range(-max_coeff, max_coeff + 1):
+        coefficients.append(i)
+    
+    # Add common fractions
+    for numerator in range(-max_coeff * 2, max_coeff * 2 + 1):
+        if numerator != 0:  # Skip zero (already have it as integer)
+            for denominator in [2, 3, 4]:
+                frac_val = numerator / denominator
+                if abs(frac_val) <= max_coeff:
+                    coefficients.append(frac_val)
+    
+    # Remove duplicates and sort
+    coefficients = sorted(list(set(coefficients)))
+    
+    # Try all combinations of coefficients
+    for coeffs in itertools.product(coefficients, repeat=n_reactions):
+        # Skip the trivial solution (all zeros)
+        if all(abs(c) < 1e-10 for c in coeffs):
+            continue
+            
+        # Check if this combination works
+        result_vector = [0] * len(target_vector)
+        for i, coeff in enumerate(coeffs):
+            for j in range(len(target_vector)):
+                result_vector[j] += coeff * matrix[j][i]
+        
+        # Check if result matches target (with tolerance for floating point errors)
+        match = True
+        for j in range(len(target_vector)):
+            if abs(result_vector[j] - target_vector[j]) > 1e-10:
+                match = False
+                break
+        
+        if match:
+            return list(coeffs)
+    
+    return None
 
 def solve_enthalpy_problem(problem_text: str) -> Dict[str, Any]:
     """

@@ -2,160 +2,17 @@
 Extended module for solving qualitative analysis problems and Ksp-based solubility calculations.
 """
 import math
-
-# Solubility data for common cations with different anions
-# True = soluble, False = insoluble
-SOLUBILITY_DATA = {
-    # Format: 'cation': {'anion': solubility_boolean}
-    'Ag+': {
-        'Cl-': False,
-        'Br-': False,
-        'I-': False,
-        'OH-': False,
-        'SO4^2-': True,  # Silver sulfate is slightly soluble
-        'CO3^2-': False,
-        'PO4^3-': False,
-        'S^2-': False,
-        'NO3-': True,
-        'CH3COO-': True
-    },
-    'Ba^2+': {
-        'Cl-': True,
-        'Br-': True,
-        'I-': True,
-        'OH-': True,
-        'SO4^2-': False,  # Barium sulfate is insoluble
-        'CO3^2-': False,
-        'PO4^3-': False,
-        'S^2-': False,
-        'NO3-': True,
-        'CH3COO-': True
-    },
-    'Ca^2+': {
-        'Cl-': True,
-        'Br-': True,
-        'I-': True,
-        'OH-': False,
-        'SO4^2-': True,  # Slightly soluble
-        'CO3^2-': False,
-        'PO4^3-': False,
-        'S^2-': False,
-        'NO3-': True,
-        'CH3COO-': True
-    },
-    'Cu^2+': {
-        'Cl-': True,
-        'Br-': True,
-        'I-': False,
-        'OH-': False,
-        'SO4^2-': True,
-        'CO3^2-': False,
-        'PO4^3-': False,
-        'S^2-': False,
-        'NO3-': True,
-        'CH3COO-': True
-    },
-    'Fe^2+': {
-        'Cl-': True,
-        'Br-': True,
-        'I-': True,
-        'OH-': False,
-        'SO4^2-': True,
-        'CO3^2-': False,
-        'PO4^3-': False,
-        'S^2-': False,
-        'NO3-': True,
-        'CH3COO-': True
-    },
-    'Fe^3+': {
-        'Cl-': True,
-        'Br-': True,
-        'I-': True,
-        'OH-': False,
-        'SO4^2-': True,
-        'CO3^3-': False,
-        'PO4^3-': False,
-        'S^2-': False,
-        'NO3-': True,
-        'CH3COO-': True
-    },
-    'Pb^2+': {
-        'Cl-': False,  # Slightly soluble in cold water
-        'Br-': False,
-        'I-': False,
-        'OH-': False,
-        'SO4^2-': False,  # Lead sulfate is insoluble
-        'CO3^2-': False,
-        'PO4^3-': False,
-        'S^2-': False,
-        'NO3-': True,
-        'CH3COO-': True
-    },
-    'Mg^2+': {
-        'Cl-': True,
-        'Br-': True,
-        'I-': True,
-        'OH-': False,
-        'SO4^2-': True,
-        'CO3^2-': False,
-        'PO4^3-': False,
-        'S^2-': False,
-        'NO3-': True,
-        'CH3COO-': True
-    },
-    'Hg2^2+': {
-        'Cl-': False,
-        'Br-': False,
-        'I-': False,
-        'OH-': False,
-        'SO4^2-': True,
-        'CO3^2-': False,
-        'PO4^3-': False,
-        'S^2-': False,
-        'NO3-': True,
-        'CH3COO-': True
-    },
-    'Zn^2+': {
-        'Cl-': True,
-        'Br-': True,
-        'I-': True,
-        'OH-': False,
-        'SO4^2-': True,
-        'CO3^2-': False,
-        'PO4^3-': False,
-        'S^2-': False,
-        'NO3-': True,
-        'CH3COO-': True
-    }
-}
-
-# Ksp values for common slightly soluble compounds
-KSP_DATA = {
-    'AgCl': {'ksp': 1.6e-10, 'molar_mass': 143.32, 'formula': 'AgCl', 'type': 'AB'},
-    'AgBr': {'ksp': 5.0e-13, 'molar_mass': 187.77, 'formula': 'AgBr', 'type': 'AB'},
-    'AgI': {'ksp': 8.3e-17, 'molar_mass': 234.77, 'formula': 'AgI', 'type': 'AB'},
-    'BaSO4': {'ksp': 1.1e-10, 'molar_mass': 233.39, 'formula': 'BaSO4', 'type': 'AB'},
-    'CaCO3': {'ksp': 3.3e-9, 'molar_mass': 100.09, 'formula': 'CaCO3', 'type': 'AB'},
-    'PbCl2': {'ksp': 1.9e-4, 'molar_mass': 278.11, 'formula': 'PbCl2', 'type': 'AB2'},
-    'PbSO4': {'ksp': 2.5e-8, 'molar_mass': 303.26, 'formula': 'PbSO4', 'type': 'AB'},
-    'Mg(OH)2': {'ksp': 5.6e-12, 'molar_mass': 58.32, 'formula': 'Mg(OH)2', 'type': 'AB2'},
-    'Ca(OH)2': {'ksp': 5.5e-6, 'molar_mass': 74.09, 'formula': 'Ca(OH)2', 'type': 'AB2'},
-    'CaF2': {'ksp': 3.9e-11, 'molar_mass': 78.07, 'formula': 'CaF2', 'type': 'AB2'},
-    'Ag2CrO4': {'ksp': 1.1e-12, 'molar_mass': 331.73, 'formula': 'Ag2CrO4', 'type': 'A2B'},
-    'Fe(OH)3': {'ksp': 2.8e-39, 'molar_mass': 106.87, 'formula': 'Fe(OH)3', 'type': 'AB3'},
-    'Al(OH)3': {'ksp': 3.0e-34, 'molar_mass': 78.00, 'formula': 'Al(OH)3', 'type': 'AB3'}
-}
-
-# Additional information for reagents
-REAGENTS = {
-    'H2SO4': {'provides': 'SO4^2-'},
-    'NaOH': {'provides': 'OH-'},
-    'HCl': {'provides': 'Cl-'},
-    'NaCl': {'provides': 'Cl-'},
-    'KCl': {'provides': 'Cl-'},
-    'AgNO3': {'provides': 'Ag+'},
-    'BaCl2': {'provides': 'Ba^2+'}
-}
+from .solubility_data import (
+    SOLUBILITY_DATA, 
+    KSP_DATA, 
+    REAGENTS, 
+    SCENARIOS,
+    get_available_cations,
+    get_available_reagents,
+    get_available_compounds,
+    get_available_scenarios,
+    get_scenario_data
+)
 
 def calculate_solubility_from_ksp(compound, ksp_value=None, temperature=25):
     """
@@ -193,7 +50,7 @@ def calculate_solubility_from_ksp(compound, ksp_value=None, temperature=25):
     else:
         return {
             "error": f"Compound {compound} not found in database and no Ksp value provided",
-            "available_compounds": list(KSP_DATA.keys())
+            "available_compounds": get_available_compounds()
         }
     
     steps.append(f"Compound type: {compound_type}")
@@ -369,6 +226,90 @@ def identify_cation_from_precipitations(candidates, precipitates_with, no_precip
         "conclusion": conclusion
     }
 
+def identify_absent_cation(candidates, precipitates_with, no_precipitate_with):
+    """
+    Identify which cation is NOT present based on precipitation tests.
+    This is the inverse of the normal identification - we find which cation
+    doesn't match the observed pattern.
+    
+    Args:
+        candidates (list): List of candidate cations
+        precipitates_with (list): List of reagents that cause precipitation
+        no_precipitate_with (list): List of reagents that don't cause precipitation
+        
+    Returns:
+        dict: Result containing absent cations and analysis
+    """
+    present_cations = []
+    absent_cations = []
+    steps = []
+    steps.append("Determining which cation is NOT present based on precipitation patterns:")
+    
+    # Check each candidate cation
+    for cation in candidates:
+        steps.append(f"\nAnalyzing {cation}:")
+        matches_pattern = True
+        
+        # Check reagents that caused precipitation
+        for reagent in precipitates_with:
+            if reagent not in REAGENTS:
+                steps.append(f"  Warning: Reagent {reagent} not in database")
+                continue
+                
+            anion = REAGENTS[reagent]['provides']
+            if cation not in SOLUBILITY_DATA:
+                steps.append(f"  Warning: Cation {cation} not in database")
+                continue
+                
+            if anion not in SOLUBILITY_DATA[cation]:
+                steps.append(f"  Warning: Solubility data for {cation} with {anion} not available")
+                continue
+                
+            is_soluble = SOLUBILITY_DATA[cation][anion]
+            precipitates = not is_soluble
+            steps.append(f"  {cation} {'precipitates' if precipitates else 'does not precipitate'} with {anion} from {reagent}")
+            
+            if not precipitates:
+                matches_pattern = False
+                steps.append(f"  ❌ {cation} does not precipitate with {reagent}, so it could explain the observed pattern")
+        
+        # Check reagents that did NOT cause precipitation
+        for reagent in no_precipitate_with:
+            if reagent not in REAGENTS:
+                steps.append(f"  Warning: Reagent {reagent} not in database")
+                continue
+                
+            anion = REAGENTS[reagent]['provides']
+            if cation not in SOLUBILITY_DATA:
+                steps.append(f"  Warning: Cation {cation} not in database")
+                continue
+                
+            if anion not in SOLUBILITY_DATA[cation]:
+                steps.append(f"  Warning: Solubility data for {cation} with {anion} not available")
+                continue
+                
+            is_soluble = SOLUBILITY_DATA[cation][anion]
+            precipitates = not is_soluble
+            steps.append(f"  {cation} {'precipitates' if precipitates else 'does not precipitate'} with {anion} from {reagent}")
+            
+            if precipitates:
+                matches_pattern = False
+                steps.append(f"  ❌ {cation} precipitates with {reagent}, but no precipitation was observed")
+        
+        # Classify the cation
+        if matches_pattern:
+            steps.append(f"  ✓ {cation} matches the observed precipitation pattern and could be present")
+            present_cations.append(cation)
+        else:
+            steps.append(f"  ✗ {cation} does NOT match the observed pattern and is likely absent")
+            absent_cations.append(cation)
+    
+    return {
+        "present_cations": present_cations,
+        "absent_cations": absent_cations,
+        "steps": steps
+    }
+
 def solve_qualitative_analysis_problem(cation_candidates, precipitates_with=None, no_precipitate_with=None):
     """
     Solves a qualitative analysis problem with given constraints.
@@ -391,14 +332,14 @@ def solve_qualitative_analysis_problem(cation_candidates, precipitates_with=None
         if cation not in SOLUBILITY_DATA:
             return {
                 "error": f"Cation {cation} not found in database",
-                "available_cations": list(SOLUBILITY_DATA.keys())
+                "available_cations": get_available_cations()
             }
     
     for reagent in precipitates_with + no_precipitate_with:
         if reagent not in REAGENTS:
             return {
                 "error": f"Reagent {reagent} not found in database",
-                "available_reagents": list(REAGENTS.keys())
+                "available_reagents": get_available_reagents()
             }
     
     # Identify cation based on precipitation patterns
@@ -410,6 +351,46 @@ def solve_qualitative_analysis_problem(cation_candidates, precipitates_with=None
     
     return result
 
+def solve_waste_water_problem():
+    """
+    Solve the specific waste water problem from the image.
+    
+    Returns:
+        dict: Analysis result showing which cation is NOT present
+    """
+    scenario_data = get_scenario_data("waste_water")
+    if not scenario_data:
+        return {"error": "Waste water scenario not found"}
+    
+    candidates = scenario_data["cation_candidates"]
+    precipitates_with = scenario_data["precipitates_with"]
+    no_precipitate_with = scenario_data["no_precipitate_with"]
+    
+    # Use the identify_absent_cation function
+    result = identify_absent_cation(candidates, precipitates_with, no_precipitate_with)
+    
+    # Add specific analysis for this problem
+    steps = result["steps"]
+    steps.append("\n" + "="*50)
+    steps.append("PROBLEM ANALYSIS:")
+    steps.append("- HCl causes no precipitation → rules out Ag+ (forms AgCl precipitate)")
+    steps.append("- H2SO4 causes precipitation → Sr^2+ forms SrSO4 precipitate")
+    steps.append("- Na+ and K+ are always soluble with both HCl and H2SO4")
+    steps.append("- Only Sr^2+ explains the observed pattern (no ppt with HCl, ppt with H2SO4)")
+    
+    conclusion = "Based on the precipitation tests:"
+    conclusion += f"\n- Present: {', '.join(result['present_cations'])}"
+    conclusion += f"\n- Absent: {', '.join(result['absent_cations'])}"
+    conclusion += f"\n\nThe cation that is definitely NOT in the waste water is: {result['absent_cations'][0] if result['absent_cations'] else 'None identified'}"
+    
+    return {
+        "present_cations": result["present_cations"],
+        "absent_cations": result["absent_cations"],
+        "steps": steps,
+        "conclusion": conclusion,
+        "answer": result['absent_cations'][0] if result['absent_cations'] else None
+    }
+
 def analyze_specific_scenario(scenario_id):
     """
     Analyze a specific predefined scenario.
@@ -420,70 +401,44 @@ def analyze_specific_scenario(scenario_id):
     Returns:
         dict: Analysis result
     """
+    scenario_data = get_scenario_data(scenario_id)
+    if not scenario_data:
+        return {
+            "error": f"Scenario {scenario_id} not found",
+            "available_scenarios": get_available_scenarios()
+        }
+    
     if scenario_id == "W20_8":
-        # Scenario from problem W20_8
         return solve_qualitative_analysis_problem(
-            cation_candidates=["Ag+", "Ba^2+", "Pb^2+"],
-            precipitates_with=["H2SO4"],
-            no_precipitate_with=["NaOH"]
+            cation_candidates=scenario_data["cation_candidates"],
+            precipitates_with=scenario_data["precipitates_with"],
+            no_precipitate_with=scenario_data["no_precipitate_with"]
         )
     elif scenario_id == "S21_11":
-        # Scenario from problem S21_11 - AgCl solubility
-        return calculate_solubility_from_ksp("AgCl", 1.6e-10)
+        return calculate_solubility_from_ksp(
+            scenario_data["compound"], 
+            scenario_data["ksp"]
+        )
+    elif scenario_id == "waste_water":
+        return solve_waste_water_problem()
     else:
-        return {"error": f"Scenario {scenario_id} not found"}
+        return {"error": f"Analysis not implemented for scenario {scenario_id}"}
 
-def get_available_cations():
-    """
-    Get a list of all available cations in the database.
-    
-    Returns:
-        list: List of cation names
-    """
-    return list(SOLUBILITY_DATA.keys())
-
-def get_available_reagents():
-    """
-    Get a list of all available reagents in the database.
-    
-    Returns:
-        list: List of reagent names
-    """
-    return list(REAGENTS.keys())
-
-def get_available_compounds():
-    """
-    Get a list of all compounds with Ksp data.
-    
-    Returns:
-        list: List of compound names
-    """
-    return list(KSP_DATA.keys())
-
-# Example usage for the specific problem from the image
+# Example usage and main execution
 if __name__ == "__main__":
-    # Solve the AgCl solubility problem from S21_11
-    print("Solving AgCl solubility problem (S21_11):")
+    print("Solving Waste Water Analysis Problem:")
     print("="*50)
     
-    result = calculate_solubility_from_ksp("AgCl", 1.6e-10)
+    result = solve_waste_water_problem()
     
     if "error" in result:
         print(f"Error: {result['error']}")
     else:
-        # Display calculation steps
+        # Display analysis steps
         for step in result["steps"]:
             print(step)
         
-        print(f"\nFinal Results:")
-        print(f"Molar solubility: {result['molar_solubility']:.2e} mol/L")
-        print(f"Mass solubility: {result['mass_solubility_g_L']:.2e} g/L")
-        print(f"Mass solubility: {result['mass_solubility_mg_L']:.2e} mg/L")
+        print(f"\n{result['conclusion']}")
         
-        # The answer choices are in scientific notation with g/L
-        print(f"\nAnswer: {result['mass_solubility_g_L']:.2e} g/L")
-        
-        # Check which answer choice this matches
-        choices = [1.82e-3, 3.82e-3, 1.82e-5, 3.82e-5, 1.82e-7]
-        closest_choice = min(choices, key=lambda x: abs(x - result['mass_solubility_g_L']))
-        print(f"Closest answer choice: {closest_choice:.2e} g/L")
+        if result["answer"]:
+            print(f"\nFINAL ANSWER: {result['answer']}")

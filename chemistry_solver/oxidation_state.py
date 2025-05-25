@@ -6,16 +6,38 @@ import re
 def parse_formula(formula):
     """
     Parse a chemical formula into a dictionary of elements and their counts.
+    Now handles charged species like SO4^2-, NH4^+, etc.
     
     Args:
-        formula (str): Chemical formula (e.g., "H2O", "Fe2O3")
+        formula (str): Chemical formula (e.g., "H2O", "Fe2O3", "SO4^2-", "NH4^+")
         
     Returns:
-        dict: Dictionary with element symbols as keys and counts as values
+        tuple: (elements_dict, charge)
+            - elements_dict: Dictionary with element symbols as keys and counts as values
+            - charge: Integer representing the charge of the compound/ion (0 for neutral)
     """
+    # Extract charge information first
+    charge = 0
+    formula_clean = formula
+    
+    # Look for charge patterns like ^2-, ^+, ^3+, etc.
+    charge_pattern = r'\^(\d*)([+-])'
+    charge_match = re.search(charge_pattern, formula)
+    
+    if charge_match:
+        charge_num = charge_match.group(1)
+        charge_sign = charge_match.group(2)
+        
+        # If no number is specified, assume 1
+        charge_magnitude = int(charge_num) if charge_num else 1
+        charge = charge_magnitude if charge_sign == '+' else -charge_magnitude
+        
+        # Remove charge notation from formula for element parsing
+        formula_clean = re.sub(charge_pattern, '', formula)
+    
     # Regular expression to match elements and their counts
     pattern = r'([A-Z][a-z]*)(\d*)'
-    matches = re.findall(pattern, formula)
+    matches = re.findall(pattern, formula_clean)
     
     # Convert matches to dictionary
     elements = {}
@@ -26,21 +48,22 @@ def parse_formula(formula):
         else:
             elements[element] = count
             
-    return elements
+    return elements, charge
 
 def calculate_oxidation_number(compound, element):
     """
     Calculate the oxidation number of an element in a compound.
+    Now properly handles charged species.
     
     Args:
-        compound (str): Chemical formula (e.g., "CrO2Cl2", "Fe2O3")
-        element (str): Element to find oxidation number for (e.g., "Cr", "Fe")
+        compound (str): Chemical formula (e.g., "CrO2Cl2", "SO4^2-", "NH4^+")
+        element (str): Element to find oxidation number for (e.g., "Cr", "S", "N")
         
     Returns:
         dict: Dictionary with calculation details
     """
-    # Parse the compound
-    elements = parse_formula(compound)
+    # Parse the compound to get elements and charge
+    elements, total_charge = parse_formula(compound)
     
     # Verify that the element exists in the compound
     if element not in elements:
@@ -60,23 +83,23 @@ def calculate_oxidation_number(compound, element):
     }
     
     # Handle special cases - more accurately detect peroxides and other special cases
+    # Remove charge notation for comparison with special case lists
+    compound_neutral = re.sub(r'\^[+-]?\d*[+-]?', '', compound)
+    
     peroxides = ["H2O2", "Na2O2", "BaO2", "K2O2", "Li2O2"]
     superoxides = ["KO2", "NaO2", "RbO2", "CsO2"]
     
-    if compound in peroxides:
+    if compound_neutral in peroxides:
         # In peroxides, oxygen has -1 oxidation state
         fixed_oxidation['O'] = -1
-    elif compound in superoxides:
+    elif compound_neutral in superoxides:
         # In superoxides, oxygen has -1/2 oxidation state
         fixed_oxidation['O'] = -0.5
     
     # Special case for metal hydrides where H has -1 oxidation state
     metal_hydrides = ["NaH", "KH", "LiH", "CaH2", "MgH2"]
-    if compound in metal_hydrides:
+    if compound_neutral in metal_hydrides:
         fixed_oxidation['H'] = -1
-    
-    # Sum of all oxidation numbers must equal the total charge (usually 0 for neutral compounds)
-    total_charge = 0  # Assuming a neutral compound
     
     # Calculate the sum of known oxidation numbers
     known_sum = 0
@@ -85,6 +108,7 @@ def calculate_oxidation_number(compound, element):
             known_sum += fixed_oxidation[elem] * count
     
     # Calculate the unknown oxidation number
+    # Sum of all oxidation numbers must equal the total charge
     unknown_oxidation = (total_charge - known_sum) / elements[element]
     
     # Prepare calculation steps for display
@@ -97,7 +121,8 @@ def calculate_oxidation_number(compound, element):
         if elem != element and elem in fixed_oxidation:
             steps.append(f"   - {elem}: {fixed_oxidation[elem]}")
     
-    steps.append(f"3. Total charge of compound: {total_charge}")
+    charge_description = f"compound/ion: {total_charge}" if total_charge != 0 else f"compound: {total_charge}"
+    steps.append(f"3. Total charge of {charge_description}")
     steps.append(f"4. Sum of known oxidation contributions:")
     
     for elem, count in elements.items():
@@ -107,8 +132,8 @@ def calculate_oxidation_number(compound, element):
     
     steps.append(f"5. Sum of known oxidation numbers: {known_sum}")
     steps.append(f"6. Calculate oxidation number for {element}:")
-    steps.append(f"   - {total_charge} - {known_sum} = {element} oxidation × {elements[element]}")
-    steps.append(f"   - {element} oxidation = ({total_charge} - {known_sum}) ÷ {elements[element]} = {unknown_oxidation}")
+    steps.append(f"   - {total_charge} - ({known_sum}) = {element} oxidation × {elements[element]}")
+    steps.append(f"   - {element} oxidation = ({total_charge} - ({known_sum})) ÷ {elements[element]} = {unknown_oxidation}")
     
     # Check if the result is an integer or very close to one
     if abs(unknown_oxidation - round(unknown_oxidation)) < 0.01:
